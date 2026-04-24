@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import psycopg2; print\\('ok'\\)\")",
+      "Bash(pip3 install *)",
+      "Bash(python3)",
+      "Bash(supabase --version)",
+      "Bash(curl -s --connect-timeout 3 https://tambxukcjdunwsxdtwir.supabase.co/rest/v1/ -o /dev/null -w \"%{http_code}\")",
+      "Bash(brew install *)",
+      "Bash(npx supabase@latest --version)",
+      "Bash(curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh)",
+      "Bash(bash)",
+      "Bash(curl -sL \"https://github.com/supabase/cli/releases/latest/download/supabase_darwin_arm64.tar.gz\" -o /tmp/supabase.tar.gz)",
+      "Read(//private/tmp/**)",
+      "Bash(tar -xzf supabase.tar.gz)",
+      "Bash(./supabase --version)",
+      "Bash(/tmp/supabase db *)",
+      "Bash(/tmp/supabase login *)",
+      "Bash(/tmp/supabase link *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(npx tsc *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Update item specs fields: reorganize order and add new fields *)"
+    ]
+  }
+}
