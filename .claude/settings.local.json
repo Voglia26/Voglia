@@ -23,7 +23,18 @@
       "Bash(git init *)",
       "Bash(git config *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'Update item specs fields: reorganize order and add new fields *)"
+      "Bash(git commit -m 'Update item specs fields: reorganize order and add new fields *)",
+      "Bash(env)",
+      "Bash(curl -s \"https://api.vercel.com/v9/projects/prj_Hqoz4s5kvSGVjubBgPPIk1yWaQpD\")",
+      "Bash(curl -s \"https://tambxukcjdunwsxdtwir.supabase.co/rest/v1/\" -H \"Accept: application/json\")",
+      "Bash(gh auth *)",
+      "Bash(cat)",
+      "Bash(chmod +x /tmp/deploy.sh)",
+      "Bash(/tmp/deploy.sh)",
+      "Bash(git rm *)",
+      "Bash(git commit *)",
+      "Bash(chmod +x /tmp/trigger_deploy.sh)",
+      "Bash(/tmp/trigger_deploy.sh)"
     ]
   }
 }
