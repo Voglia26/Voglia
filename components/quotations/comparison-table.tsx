@@ -276,7 +276,13 @@ export function ComparisonTable({
                       }
                     >
                       <SelectTrigger className="h-9 min-w-[140px]">
-                        <SelectValue placeholder="No winner" />
+                        <SelectValue placeholder="No winner">
+                          {(v: unknown): React.ReactNode =>
+                            (typeof v === "string" && v &&
+                              sortedFactories.find((x) => x.id === v)?.name) ||
+                            "No winner"
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {sortedFactories.map((f) => (
