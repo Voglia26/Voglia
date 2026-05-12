@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { redirect } from "next/navigation";
 import { isAuthenticated, signOut } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
