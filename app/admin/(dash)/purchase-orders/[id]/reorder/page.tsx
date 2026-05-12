@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { loadPurchaseOrderById } from "@/lib/po";
-import { ArrowLeft, ImageIcon } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/admin/page-header";
 import { ReorderForm } from "@/components/purchase-orders/reorder-form";
 
