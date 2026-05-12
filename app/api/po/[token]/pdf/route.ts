@@ -106,7 +106,7 @@ export async function GET(
 
   const { po, factory, quotation, items } = view;
   const grandTotal = items.reduce(
-    (sum, i) => sum + quoteTotal(i.quote) * i.quantity,
+    (sum, i) => sum + quoteTotal(i.quote ?? {}) * i.quantity,
     0
   );
 
@@ -183,7 +183,7 @@ export async function GET(
                     )
                 )
               : null,
-            React.createElement(
+            pi.quote ? React.createElement(
               View,
               { style: styles.columnsRow },
               ...QUOTE_COLUMNS.map((col) =>
@@ -191,11 +191,11 @@ export async function GET(
                   View,
                   { key: col.key, style: styles.col },
                   React.createElement(Text, { style: styles.colLabel }, col.label),
-                  React.createElement(Text, { style: styles.colValue }, fmt(pi.quote[col.key]))
+                  React.createElement(Text, { style: styles.colValue }, fmt(pi.quote![col.key]))
                 )
               )
-            ),
-            React.createElement(
+            ) : null,
+            pi.quote ? React.createElement(
               View,
               { style: styles.totals },
               React.createElement(
@@ -208,7 +208,7 @@ export async function GET(
                 { style: { fontWeight: 700 } },
                 `Line total: ${fmt(quoteTotal(pi.quote) * pi.quantity)}`
               )
-            )
+            ) : null
           )
         );
       }),

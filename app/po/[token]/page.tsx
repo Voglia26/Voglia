@@ -92,28 +92,32 @@ export default async function PublicPOPage({
                       {pi.other_comments && <><dt className="text-xs text-muted-foreground">Other comments</dt><dd className="font-medium">{pi.other_comments}</dd></>}
                     </dl>
                   )}
-                  <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                    {QUOTE_COLUMNS.map((col) => (
-                      <div key={col.key}>
-                        <dt className="text-xs text-muted-foreground">
-                          {col.label}
-                        </dt>
-                        <dd className="tabular-nums">
-                          {pi.quote[col.key] !== null &&
-                          pi.quote[col.key] !== undefined
-                            ? Number(pi.quote[col.key]).toLocaleString()
-                            : "—"}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <p className="mt-3 text-sm border-t pt-2 flex justify-between">
-                    <span>Unit total: {quoteTotal(pi.quote).toLocaleString()}</span>
-                    <span className="font-semibold">
-                      Line total:{" "}
-                      {(quoteTotal(pi.quote) * pi.quantity).toLocaleString()}
-                    </span>
-                  </p>
+                  {pi.quote && (
+                    <>
+                      <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                        {QUOTE_COLUMNS.map((col) => (
+                          <div key={col.key}>
+                            <dt className="text-xs text-muted-foreground">
+                              {col.label}
+                            </dt>
+                            <dd className="tabular-nums">
+                              {pi.quote![col.key] !== null &&
+                              pi.quote![col.key] !== undefined
+                                ? Number(pi.quote![col.key]).toLocaleString()
+                                : "—"}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <p className="mt-3 text-sm border-t pt-2 flex justify-between">
+                        <span>Unit total: {quoteTotal(pi.quote).toLocaleString()}</span>
+                        <span className="font-semibold">
+                          Line total:{" "}
+                          {(quoteTotal(pi.quote) * pi.quantity).toLocaleString()}
+                        </span>
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </Card>
