@@ -114,22 +114,21 @@ export function ComparisonTable({
 
   function handleGenerate() {
     setErr(null);
-    const payload: AwardInput[] = Object.entries(awards)
-      .map(([item_id, v]) => {
-        const quote = quotesByItemAndFactory[item_id]?.[v.factory_id];
-        if (!quote) return null;
-        return {
-          item_id,
-          factory_id: v.factory_id,
-          quote_id: quote.id,
-          quantity: v.quantity,
-          size: v.size || undefined,
-          gold_color: v.gold_color || undefined,
-          gemstone: v.gemstone || undefined,
-          other_comments: v.other_comments || undefined,
-        };
-      })
-      .filter((x): x is AwardInput => x !== null);
+    const payload: AwardInput[] = [];
+    for (const [item_id, v] of Object.entries(awards)) {
+      const quote = quotesByItemAndFactory[item_id]?.[v.factory_id];
+      if (!quote) continue;
+      payload.push({
+        item_id,
+        factory_id: v.factory_id,
+        quote_id: quote.id,
+        quantity: v.quantity,
+        size: v.size || undefined,
+        gold_color: v.gold_color || undefined,
+        gemstone: v.gemstone || undefined,
+        other_comments: v.other_comments || undefined,
+      });
+    }
 
     if (payload.length === 0) {
       setErr("Select at least one winner with quantity ≥ 1.");
@@ -262,6 +261,10 @@ export function ComparisonTable({
                               next[row.item.id] = {
                                 factory_id: v,
                                 quantity: prev[row.item.id]?.quantity ?? 1,
+                                size: prev[row.item.id]?.size ?? "",
+                                gold_color: prev[row.item.id]?.gold_color ?? "",
+                                gemstone: prev[row.item.id]?.gemstone ?? "",
+                                other_comments: prev[row.item.id]?.other_comments ?? "",
                               };
                             return next;
                           })
