@@ -4,6 +4,10 @@ import type { Item, Quote, PurchaseOrder, Factory, Quotation } from "@/lib/types
 export type POItemDetail = {
   id: string;
   quantity: number;
+  size: string | null;
+  gold_color: string | null;
+  gemstone: string | null;
+  other_comments: string | null;
   item: Item;
   quote: Quote;
 };
@@ -34,7 +38,7 @@ async function loadPurchaseOrder(
   let query = supabase
     .from("purchase_orders")
     .select(
-      "*, factory:factories(*), quotation:quotations(*), purchase_order_items(id, quantity, item:items(*), quote:quotes(*))"
+      "*, factory:factories(*), quotation:quotations(*), purchase_order_items(id, quantity, size, gold_color, gemstone, other_comments, item:items(*), quote:quotes(*))"
     );
   if (where.id) query = query.eq("id", where.id);
   if (where.token) query = query.eq("token", where.token);
@@ -48,6 +52,10 @@ async function loadPurchaseOrder(
     purchase_order_items: {
       id: string;
       quantity: number;
+      size: string | null;
+      gold_color: string | null;
+      gemstone: string | null;
+      other_comments: string | null;
       item: Item | Item[];
       quote: Quote | Quote[];
     }[];
@@ -60,6 +68,10 @@ async function loadPurchaseOrder(
   const items: POItemDetail[] = row.purchase_order_items.map((p) => ({
     id: p.id,
     quantity: p.quantity,
+    size: p.size ?? null,
+    gold_color: p.gold_color ?? null,
+    gemstone: p.gemstone ?? null,
+    other_comments: p.other_comments ?? null,
     item: Array.isArray(p.item) ? p.item[0] : p.item,
     quote: Array.isArray(p.quote) ? p.quote[0] : p.quote,
   }));

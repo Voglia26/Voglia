@@ -111,6 +111,10 @@ export type PurchaseOrderItem = {
   item_id: string;
   quote_id: string;
   quantity: number;
+  size: string | null;
+  gold_color: string | null;
+  gemstone: string | null;
+  other_comments: string | null;
 };
 
 export const QUOTE_COLUMNS = [

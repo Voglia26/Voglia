@@ -84,6 +84,14 @@ export default async function PublicPOPage({
                     </p>
                   )}
                   {pi.item.specs && <Specs specs={pi.item.specs} />}
+                  {(pi.size || pi.gold_color || pi.gemstone || pi.other_comments) && (
+                    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm border rounded-md p-3 bg-muted/30">
+                      {pi.size && <><dt className="text-xs text-muted-foreground">Size</dt><dd className="font-medium">{pi.size}</dd></>}
+                      {pi.gold_color && <><dt className="text-xs text-muted-foreground">Gold Color</dt><dd className="font-medium">{pi.gold_color}</dd></>}
+                      {pi.gemstone && <><dt className="text-xs text-muted-foreground">Gemstone</dt><dd className="font-medium">{pi.gemstone}</dd></>}
+                      {pi.other_comments && <><dt className="text-xs text-muted-foreground">Other comments</dt><dd className="font-medium">{pi.other_comments}</dd></>}
+                    </dl>
+                  )}
                   <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
                     {QUOTE_COLUMNS.map((col) => (
                       <div key={col.key}>

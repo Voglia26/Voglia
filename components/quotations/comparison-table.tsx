@@ -41,9 +41,9 @@ export function ComparisonTable({
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [awards, setAwards] = useState<
-    Record<string, { factory_id: string; quantity: number }>
+    Record<string, { factory_id: string; quantity: number; size: string; gold_color: string; gemstone: string; other_comments: string }>
   >(() => {
-    const initial: Record<string, { factory_id: string; quantity: number }> = {};
+    const initial: Record<string, { factory_id: string; quantity: number; size: string; gold_color: string; gemstone: string; other_comments: string }> = {};
     for (const item of items) {
       const quotes = quotesByItemAndFactory[item.id];
       if (!quotes) continue;
@@ -53,7 +53,7 @@ export function ComparisonTable({
         if (t <= 0) continue;
         if (!best || t < best.total) best = { factoryId: fid, total: t };
       }
-      if (best) initial[item.id] = { factory_id: best.factoryId, quantity: 1 };
+      if (best) initial[item.id] = { factory_id: best.factoryId, quantity: 1, size: "", gold_color: "", gemstone: "", other_comments: "" };
     }
     return initial;
   });
@@ -123,6 +123,10 @@ export function ComparisonTable({
           factory_id: v.factory_id,
           quote_id: quote.id,
           quantity: v.quantity,
+          size: v.size || undefined,
+          gold_color: v.gold_color || undefined,
+          gemstone: v.gemstone || undefined,
+          other_comments: v.other_comments || undefined,
         };
       })
       .filter((x): x is AwardInput => x !== null);
@@ -300,6 +304,7 @@ export function ComparisonTable({
                         setAwards((prev) => ({
                           ...prev,
                           [row.item.id]: {
+                            ...prev[row.item.id],
                             factory_id:
                               prev[row.item.id]?.factory_id ??
                               quotingFactoryIds[0],
@@ -310,6 +315,35 @@ export function ComparisonTable({
                     />
                   </td>
                 </tr>
+                {award && (
+                  <tr key={`${row.item.id}-details`} className={rowBg}>
+                    <td colSpan={4 + sortedFactories.length} className={`px-4 pb-4 border-b ${rowBg}`}>
+                      <div className="ml-14 grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                          { field: "size" as const, label: "Size", placeholder: "e.g. 7, S/M/L" },
+                          { field: "gold_color" as const, label: "Gold Color", placeholder: "e.g. Yellow, White" },
+                          { field: "gemstone" as const, label: "Gemstone", placeholder: "e.g. Diamond, Ruby" },
+                          { field: "other_comments" as const, label: "Other comments", placeholder: "Any details..." },
+                        ].map(({ field, label, placeholder }) => (
+                          <div key={field}>
+                            <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                            <Input
+                              placeholder={placeholder}
+                              className="h-8"
+                              value={award[field] ?? ""}
+                              onChange={(e) =>
+                                setAwards((prev) => ({
+                                  ...prev,
+                                  [row.item.id]: { ...prev[row.item.id], [field]: e.target.value },
+                                }))
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
               );
             })}
           </tbody>

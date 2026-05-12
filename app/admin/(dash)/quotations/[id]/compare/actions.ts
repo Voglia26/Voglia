@@ -9,6 +9,10 @@ export type AwardInput = {
   factory_id: string;
   quote_id: string;
   quantity: number;
+  size?: string;
+  gold_color?: string;
+  gemstone?: string;
+  other_comments?: string;
 };
 
 export async function generatePurchaseOrders(
@@ -40,6 +44,10 @@ export async function generatePurchaseOrders(
       item_id: a.item_id,
       quote_id: a.quote_id,
       quantity: a.quantity,
+      size: a.size || null,
+      gold_color: a.gold_color || null,
+      gemstone: a.gemstone || null,
+      other_comments: a.other_comments || null,
     }));
     const { error: itemsErr } = await supabase
       .from("purchase_order_items")

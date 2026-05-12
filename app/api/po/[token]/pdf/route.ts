@@ -162,6 +162,27 @@ export async function GET(
             pi.item.description
               ? React.createElement(Text, { style: styles.specs }, pi.item.description)
               : null,
+            (pi.size || pi.gold_color || pi.gemstone || pi.other_comments)
+              ? React.createElement(
+                  View,
+                  { style: { ...styles.columnsRow, marginTop: 6, backgroundColor: "#f9f9f9", padding: 6, borderRadius: 3 } },
+                  ...[
+                    { label: "Size", value: pi.size },
+                    { label: "Gold Color", value: pi.gold_color },
+                    { label: "Gemstone", value: pi.gemstone },
+                    { label: "Other comments", value: pi.other_comments },
+                  ]
+                    .filter((f) => f.value)
+                    .map((f) =>
+                      React.createElement(
+                        View,
+                        { key: f.label, style: styles.col },
+                        React.createElement(Text, { style: styles.colLabel }, f.label),
+                        React.createElement(Text, { style: styles.colValue }, f.value ?? "")
+                      )
+                    )
+                )
+              : null,
             React.createElement(
               View,
               { style: styles.columnsRow },
