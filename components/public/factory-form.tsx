@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { Item } from "@/lib/types";
+import type { Item, Quote } from "@/lib/types";
 import { QUOTE_COLUMNS, type QuoteColumnKey } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,14 +15,42 @@ import { submitFactoryQuotation, type QuoteInput } from "@/app/q/[token]/actions
 import { ImageIcon, Loader2, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Row = { assignmentId: string; item: Item };
+type Row = { assignmentId: string; item: Item; existingQuote?: Quote | null };
 type Values = Partial<Record<QuoteColumnKey | "final_price", string>>;
 
 export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
   const router = useRouter();
-  const [values, setValues] = useState<Record<string, Values>>({});
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [declined, setDeclined] = useState<Record<string, boolean>>({});
+  const [values, setValues] = useState<Record<string, Values>>(() => {
+    const init: Record<string, Values> = {};
+    for (const r of items) {
+      if (!r.existingQuote) continue;
+      const q = r.existingQuote;
+      init[r.assignmentId] = {
+        gold_loss: q.gold_loss != null ? String(q.gold_loss) : "",
+        total_gold_cost: q.total_gold_cost != null ? String(q.total_gold_cost) : "",
+        diamond_cost: q.diamond_cost != null ? String(q.diamond_cost) : "",
+        cost_per_carat: q.cost_per_carat != null ? String(q.cost_per_carat) : "",
+        labor: q.labor != null ? String(q.labor) : "",
+        other_fees: q.other_fees != null ? String(q.other_fees) : "",
+        final_price: q.final_price != null ? String(q.final_price) : "",
+      };
+    }
+    return init;
+  });
+  const [notes, setNotes] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const r of items) {
+      if (r.existingQuote?.notes) init[r.assignmentId] = r.existingQuote.notes;
+    }
+    return init;
+  });
+  const [declined, setDeclined] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const r of items) {
+      if (r.existingQuote?.declined) init[r.assignmentId] = true;
+    }
+    return init;
+  });
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
@@ -222,7 +250,7 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sticky bottom-0 -mx-4 sm:mx-0 px-4 sm:px-0 bg-background/95 backdrop-blur-md border-t pt-4 pb-4 sm:pb-2">
         <p className="text-xs text-muted-foreground max-w-md">
           Mark items you cannot quote as &quot;Cannot quote&quot; or leave them
-          blank. Submission is final.
+          blank. You can update your quotes at any time.
         </p>
         <Button
           size="lg"
@@ -231,7 +259,7 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
           className="h-12 eyebrow text-xs tracking-[0.2em] shrink-0"
         >
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Submit quotation
+          {items.some((r) => r.existingQuote) ? "Update quotation" : "Submit quotation"}
         </Button>
       </div>
     </div>

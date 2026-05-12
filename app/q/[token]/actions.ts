@@ -25,7 +25,6 @@ export async function submitFactoryQuotation(
     .maybeSingle();
 
   if (!qf) return { ok: false, error: "Link not found" };
-  if (qf.accepted_at) return { ok: false, error: "Already submitted" };
 
   const { data: assignRows } = await supabase
     .from("item_assignments")

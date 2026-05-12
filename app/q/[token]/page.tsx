@@ -43,16 +43,6 @@ export default async function FactoryQuotePage({
     quote: Array.isArray(r.quote) ? r.quote[0] ?? null : r.quote,
   }));
 
-  if (qf.accepted_at) {
-    return (
-      <SubmittedScreen
-        factoryName={factory?.name ?? "Factory"}
-        quotationTitle={quotation?.title ?? ""}
-        rows={rows}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
@@ -73,11 +63,16 @@ export default async function FactoryQuotePage({
             </span>{" "}
             · Please quote the items below.
           </p>
+          {qf.accepted_at && (
+            <p className="mt-3 text-xs text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2 inline-block">
+              ✓ Previously submitted — you can update your quotes below
+            </p>
+          )}
         </header>
 
         <FactoryForm
           token={token}
-          items={rows.map((r) => ({ assignmentId: r.id, item: r.item }))}
+          items={rows.map((r) => ({ assignmentId: r.id, item: r.item, existingQuote: r.quote }))}
         />
       </div>
     </div>
