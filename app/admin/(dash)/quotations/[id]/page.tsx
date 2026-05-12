@@ -108,7 +108,7 @@ export default async function QuotationEditorPage({
         description={description}
         actions={
           <>
-            {quotation.status !== "draft" && (
+            {respondedCount > 0 && (
               <Link href={`/admin/quotations/${id}/compare`}>
                 <Button>
                   <BarChart3 className="h-4 w-4 mr-2" />
