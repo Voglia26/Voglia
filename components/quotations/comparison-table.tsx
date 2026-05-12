@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { ImageIcon, ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 import { generatePurchaseOrders, type AwardInput } from "@/app/admin/(dash)/quotations/[id]/compare/actions";
 
@@ -117,11 +116,10 @@ export function ComparisonTable({
     const payload: AwardInput[] = [];
     for (const [item_id, v] of Object.entries(awards)) {
       const quote = quotesByItemAndFactory[item_id]?.[v.factory_id];
-      if (!quote) continue;
       payload.push({
         item_id,
         factory_id: v.factory_id,
-        quote_id: quote.id,
+        quote_id: quote?.id ?? null,
         quantity: v.quantity,
         size: v.size || undefined,
         gold_color: v.gold_color || undefined,
@@ -175,21 +173,29 @@ export function ComparisonTable({
               <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[180px] bg-muted/60 border-b">
                 Award to
               </th>
-              <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[90px] bg-muted/60 border-b">
+              <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[80px] bg-muted/60 border-b">
                 Qty
+              </th>
+              <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[100px] bg-muted/60 border-b">
+                Size
+              </th>
+              <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[120px] bg-muted/60 border-b">
+                Gold Color
+              </th>
+              <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[120px] bg-muted/60 border-b">
+                Gemstone
+              </th>
+              <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[150px] bg-muted/60 border-b">
+                Other
               </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, rowIdx) => {
               const award = awards[row.item.id];
-              const quotingFactoryIds = sortedFactories
-                .filter((f) => row.byFactory[f.id])
-                .map((f) => f.id);
-
               const rowBg = rowIdx % 2 === 0 ? "bg-background" : "bg-muted/30";
-              return (<React.Fragment key={row.item.id}>
-                <tr className={rowBg}>
+              return (
+                <tr key={row.item.id} className={rowBg}>
                   <td
                     className={`px-4 py-3 sticky left-0 z-10 border-b ${rowBg}`}
                   >
@@ -250,104 +256,73 @@ export function ComparisonTable({
                     );
                   })}
                   <td className="px-3 py-3 border-b">
-                    {quotingFactoryIds.length > 0 ? (
-                      <Select
-                        value={award?.factory_id ?? ""}
-                        onValueChange={(v) =>
-                          setAwards((prev) => {
-                            const next = { ...prev };
-                            if (!v) delete next[row.item.id];
-                            else
-                              next[row.item.id] = {
-                                factory_id: v,
-                                quantity: prev[row.item.id]?.quantity ?? 1,
-                                size: prev[row.item.id]?.size ?? "",
-                                gold_color: prev[row.item.id]?.gold_color ?? "",
-                                gemstone: prev[row.item.id]?.gemstone ?? "",
-                                other_comments: prev[row.item.id]?.other_comments ?? "",
-                              };
-                            return next;
-                          })
-                        }
-                      >
-                        <SelectTrigger className="h-9 min-w-[140px]">
-                          <SelectValue placeholder="No winner">
-                            {(v: unknown): React.ReactNode =>
-                              (typeof v === "string" &&
-                                v &&
-                                sortedFactories.find((x) => x.id === v)?.name) ||
-                              "No winner"
-                            }
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {quotingFactoryIds.map((fid) => {
-                            const f = sortedFactories.find((x) => x.id === fid)!;
-                            return (
-                              <SelectItem key={fid} value={fid}>
-                                {f.name}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge variant="outline">No quotes</Badge>
-                    )}
+                    <Select
+                      value={award?.factory_id ?? ""}
+                      onValueChange={(v) =>
+                        setAwards((prev) => {
+                          const next = { ...prev };
+                          if (!v) delete next[row.item.id];
+                          else
+                            next[row.item.id] = {
+                              factory_id: v,
+                              quantity: prev[row.item.id]?.quantity ?? 1,
+                              size: prev[row.item.id]?.size ?? "",
+                              gold_color: prev[row.item.id]?.gold_color ?? "",
+                              gemstone: prev[row.item.id]?.gemstone ?? "",
+                              other_comments: prev[row.item.id]?.other_comments ?? "",
+                            };
+                          return next;
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-9 min-w-[140px]">
+                        <SelectValue placeholder="No winner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sortedFactories.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            {f.name}
+                            {!row.byFactory[f.id] && (
+                              <span className="text-muted-foreground ml-1">(sin quote)</span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </td>
-                  <td className="px-3 py-3 text-right border-b">
+                  <td className="px-3 py-3 border-b">
                     <Input
                       type="number"
                       min="1"
-                      className="h-9 w-20 ml-auto text-right tabular-nums"
+                      className="h-9 w-20 text-right tabular-nums"
                       disabled={!award}
                       value={award?.quantity ?? ""}
                       onChange={(e) => {
                         const q = Math.max(1, Number(e.target.value) || 1);
                         setAwards((prev) => ({
                           ...prev,
-                          [row.item.id]: {
-                            ...prev[row.item.id],
-                            factory_id:
-                              prev[row.item.id]?.factory_id ??
-                              quotingFactoryIds[0],
-                            quantity: q,
-                          },
+                          [row.item.id]: { ...prev[row.item.id], quantity: q },
                         }));
                       }}
                     />
                   </td>
-                </tr>
-                {award && (
-                  <tr className={rowBg}>
-                    <td colSpan={4 + sortedFactories.length} className={`px-4 pb-4 border-b ${rowBg}`}>
-                      <div className="ml-14 grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {[
-                          { field: "size" as const, label: "Size", placeholder: "e.g. 7, S/M/L" },
-                          { field: "gold_color" as const, label: "Gold Color", placeholder: "e.g. Yellow, White" },
-                          { field: "gemstone" as const, label: "Gemstone", placeholder: "e.g. Diamond, Ruby" },
-                          { field: "other_comments" as const, label: "Other comments", placeholder: "Any details..." },
-                        ].map(({ field, label, placeholder }) => (
-                          <div key={field}>
-                            <p className="text-xs text-muted-foreground mb-1">{label}</p>
-                            <Input
-                              placeholder={placeholder}
-                              className="h-8"
-                              value={award[field] ?? ""}
-                              onChange={(e) =>
-                                setAwards((prev) => ({
-                                  ...prev,
-                                  [row.item.id]: { ...prev[row.item.id], [field]: e.target.value },
-                                }))
-                              }
-                            />
-                          </div>
-                        ))}
-                      </div>
+                  {(["size", "gold_color", "gemstone", "other_comments"] as const).map((field) => (
+                    <td key={field} className="px-3 py-3 border-b">
+                      <Input
+                        className="h-9 min-w-[90px]"
+                        disabled={!award}
+                        value={award?.[field] ?? ""}
+                        onChange={(e) =>
+                          setAwards((prev) => ({
+                            ...prev,
+                            [row.item.id]: { ...prev[row.item.id], [field]: e.target.value },
+                          }))
+                        }
+                      />
                     </td>
-                  </tr>
-                )}
-              </React.Fragment>);
+                  ))}
+                </tr>
+              );
             })}
           </tbody>
           </table>

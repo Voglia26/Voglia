@@ -9,7 +9,7 @@ export type POItemDetail = {
   gemstone: string | null;
   other_comments: string | null;
   item: Item;
-  quote: Quote;
+  quote: Quote | null;
 };
 
 export type POView = {
@@ -73,7 +73,7 @@ async function loadPurchaseOrder(
     gemstone: p.gemstone ?? null,
     other_comments: p.other_comments ?? null,
     item: Array.isArray(p.item) ? p.item[0] : p.item,
-    quote: Array.isArray(p.quote) ? p.quote[0] : p.quote,
+    quote: Array.isArray(p.quote) ? (p.quote[0] ?? null) : (p.quote ?? null),
   }));
 
   const { factory: _f, quotation: _q, purchase_order_items: _pi, ...po } = row;

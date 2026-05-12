@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Trash2, ImageIcon } from "lucide-react";
+import { ArrowLeft, Trash2, ImageIcon, RefreshCw } from "lucide-react";
 import { CopyPublicLink } from "@/components/purchase-orders/copy-public-link";
 import { POStatusEditor } from "@/components/purchase-orders/status-editor";
 import { PageHeader } from "@/components/admin/page-header";
@@ -28,7 +28,7 @@ export default async function PurchaseOrderDetailPage({
   const { po, factory, quotation, items } = view;
 
   const grandTotal = items.reduce(
-    (sum, i) => sum + quoteTotal(i.quote) * i.quantity,
+    (sum, i) => sum + quoteTotal(i.quote ?? {}) * i.quantity,
     0
   );
 
@@ -65,6 +65,12 @@ export default async function PurchaseOrderDetailPage({
         description={metaLine}
         actions={
           <>
+            <Link href={`/admin/purchase-orders/${id}/reorder`}>
+              <Button variant="outline">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reorder
+              </Button>
+            </Link>
             <POStatusEditor poId={po.id} current={po.status} />
             <form action={deletePurchaseOrder}>
               <input type="hidden" name="id" value={po.id} />
@@ -123,29 +129,33 @@ export default async function PurchaseOrderDetailPage({
                     {pi.other_comments && <><dt className="text-muted-foreground">Other comments</dt><dd className="font-medium">{pi.other_comments}</dd></>}
                   </dl>
                 )}
-                <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                  {QUOTE_COLUMNS.map((col) => (
-                    <div key={col.key}>
-                      <dt className="text-muted-foreground">{col.label}</dt>
-                      <dd className="tabular-nums">
-                        {pi.quote[col.key] !== null &&
-                        pi.quote[col.key] !== undefined
-                          ? Number(pi.quote[col.key]).toLocaleString()
-                          : "—"}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-                <p className="mt-2 text-sm">
-                  Unit total:{" "}
-                  <span className="font-medium">
-                    {quoteTotal(pi.quote).toLocaleString()}
-                  </span>{" "}
-                  · Line total:{" "}
-                  <span className="font-semibold">
-                    {(quoteTotal(pi.quote) * pi.quantity).toLocaleString()}
-                  </span>
-                </p>
+                {pi.quote && (
+                  <>
+                    <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                      {QUOTE_COLUMNS.map((col) => (
+                        <div key={col.key}>
+                          <dt className="text-muted-foreground">{col.label}</dt>
+                          <dd className="tabular-nums">
+                            {pi.quote![col.key] !== null &&
+                            pi.quote![col.key] !== undefined
+                              ? Number(pi.quote![col.key]).toLocaleString()
+                              : "—"}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <p className="mt-2 text-sm">
+                      Unit total:{" "}
+                      <span className="font-medium">
+                        {quoteTotal(pi.quote).toLocaleString()}
+                      </span>{" "}
+                      · Line total:{" "}
+                      <span className="font-semibold">
+                        {(quoteTotal(pi.quote) * pi.quantity).toLocaleString()}
+                      </span>
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </Card>

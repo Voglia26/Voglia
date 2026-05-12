@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export type AwardInput = {
   item_id: string;
   factory_id: string;
-  quote_id: string;
+  quote_id: string | null;
   quantity: number;
   size?: string;
   gold_color?: string;
@@ -24,7 +24,7 @@ export async function generatePurchaseOrders(
 
   const byFactory = new Map<string, AwardInput[]>();
   for (const a of awards) {
-    if (!a.quote_id || !a.factory_id || !a.item_id || a.quantity < 1) continue;
+    if (!a.factory_id || !a.item_id || a.quantity < 1) continue;
     const list = byFactory.get(a.factory_id) ?? [];
     list.push(a);
     byFactory.set(a.factory_id, list);
