@@ -39,10 +39,9 @@ export function ComparisonTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [awards, setAwards] = useState<
-    Record<string, { factory_id: string; quantity: number; size: string; gold_color: string; gemstone: string; other_comments: string }>
-  >(() => {
-    const initial: Record<string, { factory_id: string; quantity: number; size: string; gold_color: string; gemstone: string; other_comments: string }> = {};
+  type AwardRow = { factory_id: string; quantity: number; size: string; gold_color: string; gemstone: string; other_comments: string };
+  const [awards, setAwards] = useState<Record<string, AwardRow[]>>(() => {
+    const initial: Record<string, AwardRow[]> = {};
     for (const item of items) {
       const quotes = quotesByItemAndFactory[item.id];
       if (!quotes) continue;
@@ -52,10 +51,35 @@ export function ComparisonTable({
         if (t <= 0) continue;
         if (!best || t < best.total) best = { factoryId: fid, total: t };
       }
-      if (best) initial[item.id] = { factory_id: best.factoryId, quantity: 1, size: "", gold_color: "", gemstone: "", other_comments: "" };
+      if (best) initial[item.id] = [{ factory_id: best.factoryId, quantity: 1, size: "", gold_color: "", gemstone: "", other_comments: "" }];
     }
     return initial;
   });
+
+  function updateAward(item_id: string, idx: number, patch: Partial<AwardRow>) {
+    setAwards((prev) => {
+      const rows = [...(prev[item_id] ?? [])];
+      rows[idx] = { ...rows[idx], ...patch };
+      return { ...prev, [item_id]: rows };
+    });
+  }
+  function addAwardRow(item_id: string) {
+    setAwards((prev) => ({
+      ...prev,
+      [item_id]: [...(prev[item_id] ?? []), { factory_id: prev[item_id]?.[0]?.factory_id ?? "", quantity: 1, size: "", gold_color: "", gemstone: "", other_comments: "" }],
+    }));
+  }
+  function removeAwardRow(item_id: string, idx: number) {
+    setAwards((prev) => {
+      const rows = (prev[item_id] ?? []).filter((_, i) => i !== idx);
+      if (rows.length === 0) {
+        const next = { ...prev };
+        delete next[item_id];
+        return next;
+      }
+      return { ...prev, [item_id]: rows };
+    });
+  }
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
@@ -114,18 +138,21 @@ export function ComparisonTable({
   function handleGenerate() {
     setErr(null);
     const payload: AwardInput[] = [];
-    for (const [item_id, v] of Object.entries(awards)) {
-      const quote = quotesByItemAndFactory[item_id]?.[v.factory_id];
-      payload.push({
-        item_id,
-        factory_id: v.factory_id,
-        quote_id: quote?.id ?? null,
-        quantity: v.quantity,
-        size: v.size || undefined,
-        gold_color: v.gold_color || undefined,
-        gemstone: v.gemstone || undefined,
-        other_comments: v.other_comments || undefined,
-      });
+    for (const [item_id, rows] of Object.entries(awards)) {
+      for (const v of rows) {
+        if (!v.factory_id) continue;
+        const quote = quotesByItemAndFactory[item_id]?.[v.factory_id];
+        payload.push({
+          item_id,
+          factory_id: v.factory_id,
+          quote_id: quote?.id ?? null,
+          quantity: v.quantity,
+          size: v.size || undefined,
+          gold_color: v.gold_color || undefined,
+          gemstone: v.gemstone || undefined,
+          other_comments: v.other_comments || undefined,
+        });
+      }
     }
 
     if (payload.length === 0) {
@@ -139,7 +166,7 @@ export function ComparisonTable({
     });
   }
 
-  const awardsCount = Object.keys(awards).length;
+  const awardsCount = Object.values(awards).reduce((s, rows) => s + rows.length, 0);
   const canGenerate =
     quotationStatus !== "closed" && awardsCount > 0 && !submitting;
 
@@ -192,88 +219,16 @@ export function ComparisonTable({
           </thead>
           <tbody>
             {rows.map((row, rowIdx) => {
-              const award = awards[row.item.id];
+              const itemAwards = awards[row.item.id] ?? [];
               const rowBg = rowIdx % 2 === 0 ? "bg-background" : "bg-muted/30";
-              return (
-                <tr key={row.item.id} className={rowBg}>
-                  <td
-                    className={`px-4 py-3 sticky left-0 z-10 border-b ${rowBg}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {row.item.photo_url ? (
-                        <Image
-                          src={row.item.photo_url}
-                          alt=""
-                          width={44}
-                          height={44}
-                          className="h-11 w-11 object-cover rounded shrink-0"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="h-11 w-11 bg-muted rounded flex items-center justify-center shrink-0">
-                          <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <div className="truncate font-heading text-base">
-                          {row.item.name || "(untitled)"}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right font-heading text-lg tabular-nums border-b">
-                    {row.minTotal !== null ? fmt(row.minTotal) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  {sortedFactories.map((f) => {
-                    const cell = row.byFactory[f.id];
-                    const isMin =
-                      cell !== null &&
-                      cell !== undefined &&
-                      !cell.declined &&
-                      row.minTotal !== null &&
-                      cell.total === row.minTotal;
-                    return (
-                      <td
-                        key={f.id}
-                        className={`px-3 py-3 text-right tabular-nums border-b ${
-                          isMin
-                            ? "bg-green-50 dark:bg-green-950/30 font-semibold text-green-900 dark:text-green-100"
-                            : ""
-                        }`}
-                      >
-                        {!cell ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : cell.declined ? (
-                          <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em]">
-                            Declined
-                          </span>
-                        ) : (
-                          <div title={breakdown(cell.quote)}>
-                            {fmt(cell.total)}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-3 border-b">
+              const fixedCols = 2 + sortedFactories.length; // item + best total + factory cols
+
+              const AwardCells = ({ awd, idx }: { awd: AwardRow; idx: number }) => (
+                <>
+                  <td className="px-3 py-2 border-b">
                     <Select
-                      value={award?.factory_id ?? ""}
-                      onValueChange={(v) =>
-                        setAwards((prev) => {
-                          const next = { ...prev };
-                          if (!v) delete next[row.item.id];
-                          else
-                            next[row.item.id] = {
-                              factory_id: v,
-                              quantity: prev[row.item.id]?.quantity ?? 1,
-                              size: prev[row.item.id]?.size ?? "",
-                              gold_color: prev[row.item.id]?.gold_color ?? "",
-                              gemstone: prev[row.item.id]?.gemstone ?? "",
-                              other_comments: prev[row.item.id]?.other_comments ?? "",
-                            };
-                          return next;
-                        })
-                      }
+                      value={awd.factory_id}
+                      onValueChange={(v) => updateAward(row.item.id, idx, { factory_id: v ?? "" })}
                     >
                       <SelectTrigger className="h-9 min-w-[140px]">
                         <SelectValue placeholder="No winner">
@@ -296,38 +251,103 @@ export function ComparisonTable({
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-3 py-3 border-b">
-                    <Input
-                      type="number"
-                      min="1"
-                      className="h-9 w-20 text-right tabular-nums"
-                      disabled={!award}
-                      value={award?.quantity ?? ""}
-                      onChange={(e) => {
-                        const q = Math.max(1, Number(e.target.value) || 1);
-                        setAwards((prev) => ({
-                          ...prev,
-                          [row.item.id]: { ...prev[row.item.id], quantity: q },
-                        }));
-                      }}
+                  <td className="px-3 py-2 border-b">
+                    <Input type="number" min="1" className="h-9 w-20 text-right tabular-nums"
+                      value={awd.quantity}
+                      onChange={(e) => updateAward(row.item.id, idx, { quantity: Math.max(1, Number(e.target.value) || 1) })}
                     />
                   </td>
                   {(["size", "gold_color", "gemstone", "other_comments"] as const).map((field) => (
-                    <td key={field} className="px-3 py-3 border-b">
-                      <Input
-                        className="h-9 min-w-[90px]"
-                        disabled={!award}
-                        value={award?.[field] ?? ""}
-                        onChange={(e) =>
-                          setAwards((prev) => ({
-                            ...prev,
-                            [row.item.id]: { ...prev[row.item.id], [field]: e.target.value },
-                          }))
-                        }
+                    <td key={field} className="px-3 py-2 border-b">
+                      <Input className="h-9 min-w-[90px]"
+                        value={awd[field]}
+                        onChange={(e) => updateAward(row.item.id, idx, { [field]: e.target.value })}
                       />
                     </td>
                   ))}
-                </tr>
+                  <td className="px-2 py-2 border-b">
+                    <button
+                      type="button"
+                      onClick={() => removeAwardRow(row.item.id, idx)}
+                      className="h-9 w-9 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      title="Remove row"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </>
+              );
+
+              return (
+                <React.Fragment key={row.item.id}>
+                  {/* Main item row */}
+                  <tr className={rowBg}>
+                    <td className={`px-4 py-3 sticky left-0 z-10 border-b ${rowBg}`}>
+                      <div className="flex items-center gap-3">
+                        {row.item.photo_url ? (
+                          <Image src={row.item.photo_url} alt="" width={44} height={44}
+                            className="h-11 w-11 object-cover rounded shrink-0" unoptimized />
+                        ) : (
+                          <div className="h-11 w-11 bg-muted rounded flex items-center justify-center shrink-0">
+                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="truncate font-heading text-base">
+                          {row.item.name || "(untitled)"}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-right font-heading text-lg tabular-nums border-b">
+                      {row.minTotal !== null ? fmt(row.minTotal) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    {sortedFactories.map((f) => {
+                      const cell = row.byFactory[f.id];
+                      const isMin = cell !== null && cell !== undefined && !cell.declined &&
+                        row.minTotal !== null && cell.total === row.minTotal;
+                      return (
+                        <td key={f.id} className={`px-3 py-3 text-right tabular-nums border-b ${isMin ? "bg-green-50 dark:bg-green-950/30 font-semibold text-green-900 dark:text-green-100" : ""}`}>
+                          {!cell ? <span className="text-muted-foreground">—</span>
+                            : cell.declined ? <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em]">Declined</span>
+                            : <div title={breakdown(cell.quote)}>{fmt(cell.total)}</div>}
+                        </td>
+                      );
+                    })}
+                    {/* First award row inline, or empty if no awards */}
+                    {itemAwards[0] ? (
+                      <AwardCells awd={itemAwards[0]} idx={0} />
+                    ) : (
+                      <>
+                        <td className="px-3 py-3 border-b" colSpan={6}>
+                          <button type="button" onClick={() => addAwardRow(row.item.id)}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors border border-dashed rounded px-3 py-1.5">
+                            + Add order line
+                          </button>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+
+                  {/* Additional award rows */}
+                  {itemAwards.slice(1).map((awd, i) => (
+                    <tr key={i + 1} className={rowBg}>
+                      <td colSpan={fixedCols} className={`border-b ${rowBg}`} />
+                      <AwardCells awd={awd} idx={i + 1} />
+                    </tr>
+                  ))}
+
+                  {/* Add row button (only shown when at least 1 award exists) */}
+                  {itemAwards.length > 0 && (
+                    <tr className={rowBg}>
+                      <td colSpan={fixedCols} className={`border-b ${rowBg}`} />
+                      <td colSpan={7} className="px-3 py-1.5 border-b">
+                        <button type="button" onClick={() => addAwardRow(row.item.id)}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors border border-dashed rounded px-3 py-1 w-full text-left">
+                          + Add another line (different specs)
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>
