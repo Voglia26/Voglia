@@ -18,7 +18,7 @@ export default async function PublicPOPage({
   const { po, factory, quotation, items } = view;
 
   const grandTotal = items.reduce(
-    (sum, i) => sum + quoteTotal(i.quote) * i.quantity,
+    (sum, i) => sum + quoteTotal(i.quote ?? {}) * i.quantity,
     0
   );
 
