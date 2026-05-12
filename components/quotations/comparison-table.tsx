@@ -189,8 +189,8 @@ export function ComparisonTable({
                 .map((f) => f.id);
 
               const rowBg = rowIdx % 2 === 0 ? "bg-background" : "bg-muted/30";
-              return (
-                <tr key={row.item.id} className={rowBg}>
+              return (<React.Fragment key={row.item.id}>
+                <tr className={rowBg}>
                   <td
                     className={`px-4 py-3 sticky left-0 z-10 border-b ${rowBg}`}
                   >
@@ -316,7 +316,7 @@ export function ComparisonTable({
                   </td>
                 </tr>
                 {award && (
-                  <tr key={`${row.item.id}-details`} className={rowBg}>
+                  <tr className={rowBg}>
                     <td colSpan={4 + sortedFactories.length} className={`px-4 pb-4 border-b ${rowBg}`}>
                       <div className="ml-14 grid grid-cols-2 md:grid-cols-4 gap-3">
                         {[
@@ -344,7 +344,7 @@ export function ComparisonTable({
                     </td>
                   </tr>
                 )}
-              );
+              </React.Fragment>);
             })}
           </tbody>
           </table>
