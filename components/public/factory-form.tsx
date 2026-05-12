@@ -168,7 +168,7 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
                     htmlFor={`${row.assignmentId}-final_price`}
                     className="eyebrow text-[10px] mb-1.5 block"
                   >
-                    Final price (all-inclusive) — optional
+                    <strong>FINAL PRICE (ALL-INCLUSIVE)</strong>
                   </Label>
                   <Input
                     id={`${row.assignmentId}-final_price`}
