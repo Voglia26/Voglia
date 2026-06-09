@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Item } from "@/lib/types";
-import { QUOTE_COLUMNS, type QuoteColumnKey, quoteTotal } from "@/lib/types";
+import { QUOTE_COLUMNS, KARATAGE_OPTIONS, type QuoteColumnKey, quoteTotal } from "@/lib/types";
 import { ItemPhotos } from "@/components/items/item-photos";
+import { ItemDetails } from "@/components/public/item-details";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +37,10 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, Values>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [karatage, setKaratage] = useState<Record<string, string>>({});
+  const [productDescriptions, setProductDescriptions] = useState<
+    Record<string, string>
+  >({});
   const [declined, setDeclined] = useState<Record<string, boolean>>({});
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -56,6 +61,8 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
         values: parsed,
         declined: !!declined[r.assignmentId],
         notes: notes[r.assignmentId] ?? null,
+        karatage: karatage[r.assignmentId] ?? null,
+        product_description: productDescriptions[r.assignmentId] ?? null,
       };
     });
 
@@ -72,66 +79,109 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
         {items.map((row, idx) => {
           const isDeclined = !!declined[row.assignmentId];
           return (
-            <Card
+            <div
               key={row.assignmentId}
-              className={cn(
-                "p-5 sm:p-6 transition-colors",
-                isDeclined
-                  ? "bg-muted/40 border-dashed"
-                  : "hover:border-foreground/20"
-              )}
+              className="factory-form-item space-y-4 rounded-xl border border-border bg-card p-5 sm:p-6"
             >
-              <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 mb-5">
-                <div className="shrink-0 self-center sm:self-start">
-                  <ItemPhotos
-                    urls={row.item.photo_urls}
-                    size="lg"
-                    faded={isDeclined}
-                    zoomable
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="eyebrow mb-1">Item {idx + 1}</p>
-                  <h3
-                    className={cn(
-                      "font-heading text-2xl sm:text-3xl",
-                      isDeclined && "line-through opacity-60"
-                    )}
-                  >
-                    {row.item.name || "(untitled)"}
-                  </h3>
-                  {row.item.description && (
-                    <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">
-                      {row.item.description}
-                    </p>
-                  )}
-                  {row.item.specs && <Specs specs={row.item.specs} />}
-
-                  <label className="mt-4 inline-flex items-center gap-2 cursor-pointer select-none">
-                    <Checkbox
-                      checked={isDeclined}
-                      onCheckedChange={(v) =>
-                        setDeclined((prev) => ({
-                          ...prev,
-                          [row.assignmentId]: !!v,
-                        }))
-                      }
+              <Card
+                className={cn(
+                  "p-0 border-0 shadow-none ring-0 bg-transparent",
+                  isDeclined && "opacity-60"
+                )}
+              >
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
+                  <div className="shrink-0 self-center sm:self-start">
+                    <ItemPhotos
+                      urls={row.item.photo_urls ?? []}
+                      size="lg"
+                      faded={isDeclined}
+                      zoomable
                     />
-                    <span className="text-sm inline-flex items-center gap-1.5">
-                      <Ban className="h-3.5 w-3.5" />
-                      Cannot quote this item
-                    </span>
-                  </label>
-                </div>
-              </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="eyebrow mb-2">Item {idx + 1}</p>
+                    <ItemDetails item={row.item} faded={isDeclined} />
 
-              <fieldset disabled={isDeclined} className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                    <label className="mt-4 inline-flex items-center gap-2 cursor-pointer select-none">
+                      <Checkbox
+                        checked={isDeclined}
+                        onCheckedChange={(v) =>
+                          setDeclined((prev) => ({
+                            ...prev,
+                            [row.assignmentId]: !!v,
+                          }))
+                        }
+                      />
+                      <span className="text-sm inline-flex items-center gap-1.5">
+                        <Ban className="h-3.5 w-3.5" />
+                        Cannot quote this item
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </Card>
+
+              <label
+                htmlFor={`${row.assignmentId}-karatage`}
+                className="block text-sm font-medium"
+              >
+                Karatage
+              </label>
+              <select
+                id={`${row.assignmentId}-karatage`}
+                value={karatage[row.assignmentId] ?? ""}
+                onChange={(e) =>
+                  setKaratage((prev) => ({
+                    ...prev,
+                    [row.assignmentId]: e.target.value,
+                  }))
+                }
+                className="block w-full h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+              >
+                <option value="">Select karatage</option>
+                {KARATAGE_OPTIONS.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+
+              <label
+                htmlFor={`${row.assignmentId}-product_description`}
+                className="block text-sm font-medium"
+              >
+                Product description
+              </label>
+              <textarea
+                id={`${row.assignmentId}-product_description`}
+                rows={3}
+                value={productDescriptions[row.assignmentId] ?? ""}
+                onChange={(e) =>
+                  setProductDescriptions((prev) => ({
+                    ...prev,
+                    [row.assignmentId]: e.target.value,
+                  }))
+                }
+                placeholder="Describe the product you are quoting..."
+                className="block w-full min-h-24 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+              />
+
+              <Card
+                className={cn(
+                  "p-0 border-0 shadow-none ring-0 bg-transparent space-y-5",
+                  isDeclined && "opacity-50 pointer-events-none"
+                )}
+              >
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">
+                    Cost breakdown
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                   {QUOTE_COLUMNS.map((col) => (
                     <div key={col.key} className="space-y-1.5">
                       <Label
                         htmlFor={`${row.assignmentId}-${col.key}`}
-                        className="eyebrow text-[10px]"
+                        className="text-xs font-medium text-muted-foreground"
                       >
                         {col.label}
                       </Label>
@@ -140,6 +190,7 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
                         type="number"
                         step="0.01"
                         inputMode="decimal"
+                        disabled={isDeclined}
                         className="h-11 text-base tabular-nums"
                         value={values[row.assignmentId]?.[col.key] ?? ""}
                         onChange={(e) =>
@@ -148,10 +199,11 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
                       />
                     </div>
                   ))}
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t">
-                  <p className="eyebrow text-[10px] mb-1.5">Total</p>
+                  <Label className="text-sm font-medium mb-1.5 block">Total</Label>
                   <p className="h-12 flex items-center text-lg tabular-nums font-heading">
                     {computeDisplayTotal(values[row.assignmentId]).toLocaleString(
                       undefined,
@@ -160,16 +212,17 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
                   </p>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <Label
                     htmlFor={`${row.assignmentId}-notes`}
-                    className="eyebrow text-[10px]"
+                    className="text-sm font-medium"
                   >
                     Notes (optional)
                   </Label>
                   <Textarea
                     id={`${row.assignmentId}-notes`}
                     rows={2}
+                    disabled={isDeclined}
                     value={notes[row.assignmentId] ?? ""}
                     onChange={(e) =>
                       setNotes((prev) => ({
@@ -180,8 +233,8 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
                     placeholder="Lead time, comments, etc."
                   />
                 </div>
-              </fieldset>
-            </Card>
+              </Card>
+            </div>
           );
         })}
       </div>
@@ -211,23 +264,5 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
         </Button>
       </div>
     </div>
-  );
-}
-
-function Specs({ specs }: { specs: Item["specs"] }) {
-  if (!specs) return null;
-  const entries = [
-    specs.weight_g !== null && specs.weight_g !== undefined
-      ? `${specs.weight_g}g`
-      : null,
-    specs.carats ? `${specs.carats}ct` : null,
-    specs.gold_type || null,
-    specs.stone_type || null,
-  ].filter(Boolean);
-  if (entries.length === 0) return null;
-  return (
-    <p className="text-xs text-muted-foreground mt-2 tracking-wide">
-      {entries.join(" · ")}
-    </p>
   );
 }

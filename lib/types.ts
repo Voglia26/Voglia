@@ -86,8 +86,13 @@ export type Quote = {
   final_price: number | null;
   declined: boolean;
   notes: string | null;
+  karatage: string | null;
+  product_description: string | null;
   submitted_at: string;
 };
+
+export const KARATAGE_OPTIONS = ["10k", "14k", "18k", "24k"] as const;
+export type KaratageOption = (typeof KARATAGE_OPTIONS)[number];
 
 export type PurchaseOrder = {
   id: string;

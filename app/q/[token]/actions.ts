@@ -10,6 +10,8 @@ export type QuoteInput = {
   final_price?: number | null;
   declined?: boolean;
   notes?: string | null;
+  karatage?: string | null;
+  product_description?: string | null;
 };
 
 export async function submitFactoryQuotation(
@@ -47,7 +49,17 @@ export async function submitFactoryQuotation(
         i.final_price !== undefined &&
         !Number.isNaN(i.final_price);
       const hasNotes = !!(i.notes && i.notes.trim());
-      return hasNumber || hasFinal || hasNotes;
+      const hasKaratage = !!(i.karatage && i.karatage.trim());
+      const hasProductDescription = !!(
+        i.product_description && i.product_description.trim()
+      );
+      return (
+        hasNumber ||
+        hasFinal ||
+        hasNotes ||
+        hasKaratage ||
+        hasProductDescription
+      );
     })
     .map((i) => ({
       item_assignment_id: i.assignmentId,
@@ -60,6 +72,10 @@ export async function submitFactoryQuotation(
       final_price: i.declined ? null : i.final_price ?? null,
       declined: !!i.declined,
       notes: i.notes?.trim() || null,
+      karatage: i.declined ? null : i.karatage?.trim() || null,
+      product_description: i.declined
+        ? null
+        : i.product_description?.trim() || null,
     }));
 
   if (rows.length > 0) {
