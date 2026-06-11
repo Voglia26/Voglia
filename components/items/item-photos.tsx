@@ -26,9 +26,15 @@ export function ItemPhotos({
   faded?: boolean;
   zoomable?: boolean;
 }) {
-  const visible = limit ? urls.slice(0, limit) : urls;
   const { box, icon } = SIZES[size];
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Zoomable: one main thumbnail; full set opens in lightbox carousel
+  const thumbUrls = zoomable
+    ? urls.slice(0, 1)
+    : limit
+      ? urls.slice(0, limit)
+      : urls;
 
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
 
@@ -75,7 +81,7 @@ export function ItemPhotos({
     className
   );
 
-  if (visible.length === 0) {
+  if (thumbUrls.length === 0) {
     return (
       <div
         className={cn(
@@ -90,26 +96,37 @@ export function ItemPhotos({
   }
 
   const thumbs =
-    visible.length === 1 ? (
+    thumbUrls.length === 1 ? (
       <button
         type="button"
         onClick={() => openLightbox(0)}
         disabled={!zoomable}
-        className={cn("block", !zoomable && "cursor-default")}
-        aria-label={zoomable ? "View photo" : undefined}
+        className={cn("relative block", !zoomable && "cursor-default")}
+        aria-label={
+          zoomable
+            ? urls.length > 1
+              ? `View all ${urls.length} photos`
+              : "View photo"
+            : undefined
+        }
       >
         <Image
-          src={visible[0]}
+          src={thumbUrls[0]}
           alt=""
           width={160}
           height={160}
           className={thumbClass}
           unoptimized
         />
+        {zoomable && urls.length > 1 && (
+          <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums">
+            1 / {urls.length}
+          </span>
+        )}
       </button>
     ) : (
       <div className={cn("flex flex-wrap gap-1.5 shrink-0", className)}>
-        {visible.map((url, i) => (
+        {thumbUrls.map((url, i) => (
           <button
             key={url}
             type="button"
