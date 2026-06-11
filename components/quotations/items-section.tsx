@@ -93,8 +93,8 @@ export function ItemsSection({
               <span className="eyebrow">Add item</span>
             </div>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-lg max-h-[min(90vh,720px)] flex flex-col gap-0 p-0 overflow-hidden">
+            <DialogHeader className="shrink-0 px-4 pt-4 pb-2">
               <DialogTitle>New item</DialogTitle>
             </DialogHeader>
             <ItemForm
@@ -110,8 +110,8 @@ export function ItemsSection({
       </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg max-h-[min(90vh,720px)] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="shrink-0 px-4 pt-4 pb-2">
             <DialogTitle>Edit item</DialogTitle>
           </DialogHeader>
           {editing && (
@@ -143,7 +143,8 @@ function ItemForm({
   submitLabel: string;
 }) {
   return (
-    <form action={onSubmit} className="space-y-4">
+    <form action={onSubmit} className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-2">
       {item && <input type="hidden" name="id" value={item.id} />}
       <input type="hidden" name="quotation_id" value={quotationId} />
 
@@ -220,8 +221,9 @@ function ItemForm({
           </div>
         </div>
       </div>
+      </div>
 
-      <DialogFooter>
+      <DialogFooter className="sticky bottom-0 z-10 shrink-0 border-t bg-popover px-4 py-4 mx-0 mb-0 mt-0 rounded-none sm:justify-end">
         <Button type="submit">{submitLabel}</Button>
       </DialogFooter>
     </form>
