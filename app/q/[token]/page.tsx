@@ -40,17 +40,18 @@ export default async function FactoryQuotePage({
     .eq("quotation_factory_id", qf.id);
 
   const assignments = (assignRows ?? []) as AssignmentRow[];
+  const assignmentIds = assignments.map((a) => a.id);
   const itemIds = [...new Set(assignments.map((a) => a.item_id))];
 
   const [{ data: itemsData }, { data: variantsData }] = await Promise.all([
     itemIds.length > 0
       ? supabase.from("items").select("*").in("id", itemIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
-    itemIds.length > 0
+    assignmentIds.length > 0
       ? supabase
           .from("item_variants")
           .select("*")
-          .in("item_id", itemIds)
+          .in("item_assignment_id", assignmentIds)
           .order("position", { ascending: true })
       : Promise.resolve({ data: [] as ItemVariant[] }),
   ]);
@@ -62,11 +63,11 @@ export default async function FactoryQuotePage({
     })
   );
 
-  const variantsByItem = new Map<string, ItemVariant[]>();
+  const variantsByAssignment = new Map<string, ItemVariant[]>();
   for (const v of (variantsData ?? []) as ItemVariant[]) {
-    const list = variantsByItem.get(v.item_id) ?? [];
+    const list = variantsByAssignment.get(v.item_assignment_id) ?? [];
     list.push(v);
-    variantsByItem.set(v.item_id, list);
+    variantsByAssignment.set(v.item_assignment_id, list);
   }
 
   const rows = assignments
@@ -78,7 +79,7 @@ export default async function FactoryQuotePage({
       for (const q of quotes) {
         quotesByVariantId[q.variant_id] = q;
       }
-      const variants = variantsByItem.get(a.item_id) ?? [];
+      const variants = variantsByAssignment.get(a.id) ?? [];
       return {
         assignmentId: a.id,
         item,
@@ -94,7 +95,7 @@ export default async function FactoryQuotePage({
         item: Item;
         variants: ItemVariant[];
         quotesByVariantId: Record<string, Quote | null>;
-      } => !!r && r.variants.length > 0
+      } => !!r
     );
 
   const alreadySubmitted = !!qf.accepted_at;
@@ -119,7 +120,7 @@ export default async function FactoryQuotePage({
             </span>
             {alreadySubmitted
               ? " · Update your quote below and resubmit."
-              : " · Please quote each variant below."}
+              : " · Add quote options for each item and submit when ready."}
           </p>
         </header>
 

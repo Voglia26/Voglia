@@ -12,9 +12,14 @@ import { ItemPhotos } from "@/components/items/item-photos";
 import { ItemDetails } from "@/components/public/item-details";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { submitFactoryQuotation, type QuoteInput } from "@/app/q/[token]/actions";
-import { Loader2, Ban } from "lucide-react";
+import {
+  submitFactoryQuotation,
+  type VariantQuoteInput,
+} from "@/app/q/[token]/actions";
+import { Loader2, Ban, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type FactoryFormRow = {
@@ -22,6 +27,12 @@ export type FactoryFormRow = {
   item: Item;
   variants: ItemVariant[];
   quotesByVariantId: Record<string, Quote | null>;
+};
+
+type LocalVariant = {
+  id: string;
+  label: string;
+  description: string;
 };
 
 type Values = Partial<Record<QuoteColumnKey, string>>;
@@ -37,6 +48,18 @@ function costFieldName(
   col: QuoteColumnKey
 ): string {
   return `${assignmentId}__${variantId}__${col}`;
+}
+
+function initialVariantsByAssignment(rows: FactoryFormRow[]) {
+  const out: Record<string, LocalVariant[]> = {};
+  for (const row of rows) {
+    out[row.assignmentId] = row.variants.map((v) => ({
+      id: v.id,
+      label: v.label,
+      description: v.description ?? "",
+    }));
+  }
+  return out;
 }
 
 function initialFormState(rows: FactoryFormRow[]) {
@@ -116,6 +139,9 @@ export function FactoryForm({
   const formRef = useRef<HTMLFormElement>(null);
   const initialRef = useRef(initialFormState(rows));
 
+  const [variantsByAssignment, setVariantsByAssignment] = useState<
+    Record<string, LocalVariant[]>
+  >(() => initialVariantsByAssignment(rows));
   const [draftValues, setDraftValues] = useState<Record<FieldKey, Values>>(
     () => initialRef.current.values
   );
@@ -135,6 +161,70 @@ export function FactoryForm({
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(alreadySubmitted);
 
+  function addVariant(assignmentId: string) {
+    setVariantsByAssignment((prev) => {
+      const list = prev[assignmentId] ?? [];
+      const n = list.length + 1;
+      return {
+        ...prev,
+        [assignmentId]: [
+          ...list,
+          {
+            id: crypto.randomUUID(),
+            label: `Option ${n}`,
+            description: "",
+          },
+        ],
+      };
+    });
+  }
+
+  function removeVariant(assignmentId: string, variantId: string) {
+    setVariantsByAssignment((prev) => ({
+      ...prev,
+      [assignmentId]: (prev[assignmentId] ?? []).filter((v) => v.id !== variantId),
+    }));
+    const fk = fieldKey(assignmentId, variantId);
+    setDraftValues((prev) => {
+      const next = { ...prev };
+      delete next[fk];
+      return next;
+    });
+    setNotes((prev) => {
+      const next = { ...prev };
+      delete next[fk];
+      return next;
+    });
+    setKaratage((prev) => {
+      const next = { ...prev };
+      delete next[fk];
+      return next;
+    });
+    setProductDescriptions((prev) => {
+      const next = { ...prev };
+      delete next[fk];
+      return next;
+    });
+    setDeclined((prev) => {
+      const next = { ...prev };
+      delete next[fk];
+      return next;
+    });
+  }
+
+  function updateVariantMeta(
+    assignmentId: string,
+    variantId: string,
+    patch: Partial<Pick<LocalVariant, "label" | "description">>
+  ) {
+    setVariantsByAssignment((prev) => ({
+      ...prev,
+      [assignmentId]: (prev[assignmentId] ?? []).map((v) =>
+        v.id === variantId ? { ...v, ...patch } : v
+      ),
+    }));
+  }
+
   function handleCostInput(fk: FieldKey, col: QuoteColumnKey, v: string) {
     if (v && declined[fk]) {
       setDeclined((prev) => ({ ...prev, [fk]: false }));
@@ -151,14 +241,17 @@ export function FactoryForm({
       ? readCostValuesFromForm(formRef.current)
       : draftValues;
 
-    const inputs: QuoteInput[] = [];
+    const inputs: VariantQuoteInput[] = [];
     for (const row of rows) {
-      for (const variant of row.variants) {
+      const variants = variantsByAssignment[row.assignmentId] ?? [];
+      for (const variant of variants) {
         const fk = fieldKey(row.assignmentId, variant.id);
         const parsed = parseValues(formValues[fk]);
         inputs.push({
           assignmentId: row.assignmentId,
           variantId: variant.id,
+          label: variant.label,
+          description: variant.description,
           values: parsed,
           declined: !!declined[fk],
           notes: notes[fk] ?? null,
@@ -166,6 +259,16 @@ export function FactoryForm({
           product_description: productDescriptions[fk] ?? null,
         });
       }
+    }
+
+    if (inputs.length === 0) {
+      setErr("Add at least one quote option before submitting.");
+      return;
+    }
+
+    if (inputs.some((i) => !i.label.trim())) {
+      setErr("Every quote option needs a name.");
+      return;
     }
 
     startTransition(async () => {
@@ -190,203 +293,265 @@ export function FactoryForm({
         <div className="rounded-lg border border-green-600/30 bg-green-600/5 p-4 text-sm">
           <p className="font-medium">Quotation saved</p>
           <p className="text-muted-foreground mt-0.5">
-            All variants were submitted together. You can keep editing and
+            All options were submitted together. You can keep editing and
             resubmit when ready.
           </p>
         </div>
       )}
       <div className="space-y-4">
-        {rows.map((row, idx) => (
-          <div
-            key={row.assignmentId}
-            className="factory-form-item space-y-4 rounded-xl border border-border bg-card p-5 sm:p-6"
-          >
-            <Card className="overflow-visible p-0 border-0 shadow-none ring-0 bg-transparent">
-              <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
-                <div className="shrink-0 self-center sm:self-start">
-                  <ItemPhotos
-                    urls={row.item.photo_urls ?? []}
-                    size="lg"
-                    zoomable
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="eyebrow mb-2">Item {idx + 1}</p>
-                  <ItemDetails item={row.item} />
-                </div>
-              </div>
-            </Card>
+        {rows.map((row, idx) => {
+          const variants = variantsByAssignment[row.assignmentId] ?? [];
 
-            <div className="space-y-6 border-t border-border pt-5">
-              {row.variants.map((variant) => {
-                const fk = fieldKey(row.assignmentId, variant.id);
-                const isDeclined = !!declined[fk];
-                const displayValues = draftValues[fk];
-
-                return (
-                  <div
-                    key={variant.id}
-                    className={cn(
-                      "space-y-4 rounded-lg border border-border bg-muted/20 p-4 sm:p-5",
-                      isDeclined && "opacity-60"
-                    )}
-                  >
-                    <div>
-                      <p className="font-heading text-lg leading-tight">
-                        {variant.label}
-                      </p>
-                      {variant.description ? (
-                        <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                          {variant.description}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                      <Checkbox
-                        checked={isDeclined}
-                        onCheckedChange={(v) =>
-                          setDeclined((prev) => ({
-                            ...prev,
-                            [fk]: !!v,
-                          }))
-                        }
-                      />
-                      <span className="text-sm inline-flex items-center gap-1.5">
-                        <Ban className="h-3.5 w-3.5" />
-                        Cannot quote this variant
-                      </span>
-                    </label>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor={`${fk}-karatage`}
-                        className="block text-sm font-medium"
-                      >
-                        Karatage
-                      </label>
-                      <select
-                        id={`${fk}-karatage`}
-                        value={karatage[fk] ?? ""}
-                        onChange={(e) =>
-                          setKaratage((prev) => ({
-                            ...prev,
-                            [fk]: e.target.value,
-                          }))
-                        }
-                        className="block w-full h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground"
-                      >
-                        <option value="">Select karatage</option>
-                        {KARATAGE_OPTIONS.map((k) => (
-                          <option key={k} value={k}>
-                            {k}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor={`${fk}-product_description`}
-                        className="block text-sm font-medium"
-                      >
-                        Product description
-                      </label>
-                      <textarea
-                        id={`${fk}-product_description`}
-                        rows={3}
-                        value={productDescriptions[fk] ?? ""}
-                        onChange={(e) =>
-                          setProductDescriptions((prev) => ({
-                            ...prev,
-                            [fk]: e.target.value,
-                          }))
-                        }
-                        placeholder="Describe the product you are quoting for this variant..."
-                        className="block w-full min-h-24 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-                      />
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-semibold text-foreground mb-3">
-                        Cost breakdown
-                      </p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-                        {QUOTE_COLUMNS.map((col) => (
-                          <div key={col.key} className="space-y-1.5">
-                            <label
-                              htmlFor={`${fk}-${col.key}`}
-                              className="text-xs font-medium text-muted-foreground"
-                            >
-                              {col.label}
-                            </label>
-                            <input
-                              id={`${fk}-${col.key}`}
-                              name={costFieldName(
-                                row.assignmentId,
-                                variant.id,
-                                col.key
-                              )}
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              defaultValue={
-                                initialRef.current.values[fk]?.[col.key] ?? ""
-                              }
-                              onInput={(e) =>
-                                handleCostInput(
-                                  fk,
-                                  col.key,
-                                  e.currentTarget.value
-                                )
-                              }
-                              className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t">
-                      <p className="text-sm font-medium mb-1.5">Total</p>
-                      <p className="h-12 flex items-center text-lg tabular-nums font-heading">
-                        {computeDisplayTotal(displayValues).toLocaleString(
-                          undefined,
-                          {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          }
-                        )}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor={`${fk}-notes`}
-                        className="text-sm font-medium"
-                      >
-                        Notes (optional)
-                      </label>
-                      <textarea
-                        id={`${fk}-notes`}
-                        rows={2}
-                        value={notes[fk] ?? ""}
-                        onChange={(e) =>
-                          setNotes((prev) => ({
-                            ...prev,
-                            [fk]: e.target.value,
-                          }))
-                        }
-                        placeholder="Lead time, comments, etc."
-                        className="block w-full min-h-16 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                      />
-                    </div>
+          return (
+            <div
+              key={row.assignmentId}
+              className="factory-form-item space-y-4 rounded-xl border border-border bg-card p-5 sm:p-6"
+            >
+              <Card className="overflow-visible p-0 border-0 shadow-none ring-0 bg-transparent">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
+                  <div className="shrink-0 self-center sm:self-start">
+                    <ItemPhotos
+                      urls={row.item.photo_urls ?? []}
+                      size="lg"
+                      zoomable
+                    />
                   </div>
-                );
-              })}
+                  <div className="min-w-0 flex-1">
+                    <p className="eyebrow mb-2">Item {idx + 1}</p>
+                    <ItemDetails item={row.item} />
+                  </div>
+                </div>
+              </Card>
+
+              <div className="space-y-4 border-t border-border pt-5">
+                {variants.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No quote options yet. Add one to start quoting this item.
+                  </p>
+                ) : (
+                  variants.map((variant) => {
+                    const fk = fieldKey(row.assignmentId, variant.id);
+                    const isDeclined = !!declined[fk];
+                    const displayValues = draftValues[fk];
+
+                    return (
+                      <div
+                        key={variant.id}
+                        className={cn(
+                          "space-y-4 rounded-lg border border-border bg-muted/20 p-4 sm:p-5",
+                          isDeclined && "opacity-60"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 space-y-3 min-w-0">
+                            <div className="space-y-1.5">
+                              <label
+                                htmlFor={`${fk}-label`}
+                                className="text-xs font-medium text-muted-foreground"
+                              >
+                                Option name
+                              </label>
+                              <Input
+                                id={`${fk}-label`}
+                                value={variant.label}
+                                onChange={(e) =>
+                                  updateVariantMeta(row.assignmentId, variant.id, {
+                                    label: e.target.value,
+                                  })
+                                }
+                                placeholder="e.g. With diamonds"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label
+                                htmlFor={`${fk}-description`}
+                                className="text-xs font-medium text-muted-foreground"
+                              >
+                                Option description (optional)
+                              </label>
+                              <Textarea
+                                id={`${fk}-description`}
+                                rows={2}
+                                value={variant.description}
+                                onChange={(e) =>
+                                  updateVariantMeta(row.assignmentId, variant.id, {
+                                    description: e.target.value,
+                                  })
+                                }
+                                placeholder="Details about this option..."
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Remove option"
+                            onClick={() =>
+                              removeVariant(row.assignmentId, variant.id)
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                          <Checkbox
+                            checked={isDeclined}
+                            onCheckedChange={(v) =>
+                              setDeclined((prev) => ({
+                                ...prev,
+                                [fk]: !!v,
+                              }))
+                            }
+                          />
+                          <span className="text-sm inline-flex items-center gap-1.5">
+                            <Ban className="h-3.5 w-3.5" />
+                            Cannot quote this option
+                          </span>
+                        </label>
+
+                        <div className="space-y-2">
+                          <label
+                            htmlFor={`${fk}-karatage`}
+                            className="block text-sm font-medium"
+                          >
+                            Karatage
+                          </label>
+                          <select
+                            id={`${fk}-karatage`}
+                            value={karatage[fk] ?? ""}
+                            onChange={(e) =>
+                              setKaratage((prev) => ({
+                                ...prev,
+                                [fk]: e.target.value,
+                              }))
+                            }
+                            className="block w-full h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+                          >
+                            <option value="">Select karatage</option>
+                            {KARATAGE_OPTIONS.map((k) => (
+                              <option key={k} value={k}>
+                                {k}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label
+                            htmlFor={`${fk}-product_description`}
+                            className="block text-sm font-medium"
+                          >
+                            Product description
+                          </label>
+                          <textarea
+                            id={`${fk}-product_description`}
+                            rows={3}
+                            value={productDescriptions[fk] ?? ""}
+                            onChange={(e) =>
+                              setProductDescriptions((prev) => ({
+                                ...prev,
+                                [fk]: e.target.value,
+                              }))
+                            }
+                            placeholder="Describe the product you are quoting for this option..."
+                            className="block w-full min-h-24 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                          />
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-semibold text-foreground mb-3">
+                            Cost breakdown
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                            {QUOTE_COLUMNS.map((col) => (
+                              <div key={col.key} className="space-y-1.5">
+                                <label
+                                  htmlFor={`${fk}-${col.key}`}
+                                  className="text-xs font-medium text-muted-foreground"
+                                >
+                                  {col.label}
+                                </label>
+                                <input
+                                  id={`${fk}-${col.key}`}
+                                  name={costFieldName(
+                                    row.assignmentId,
+                                    variant.id,
+                                    col.key
+                                  )}
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  defaultValue={
+                                    initialRef.current.values[fk]?.[col.key] ?? ""
+                                  }
+                                  onInput={(e) =>
+                                    handleCostInput(
+                                      fk,
+                                      col.key,
+                                      e.currentTarget.value
+                                    )
+                                  }
+                                  className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t">
+                          <p className="text-sm font-medium mb-1.5">Total</p>
+                          <p className="h-12 flex items-center text-lg tabular-nums font-heading">
+                            {computeDisplayTotal(displayValues).toLocaleString(
+                              undefined,
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              }
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label
+                            htmlFor={`${fk}-notes`}
+                            className="text-sm font-medium"
+                          >
+                            Notes (optional)
+                          </label>
+                          <textarea
+                            id={`${fk}-notes`}
+                            rows={2}
+                            value={notes[fk] ?? ""}
+                            onChange={(e) =>
+                              setNotes((prev) => ({
+                                ...prev,
+                                [fk]: e.target.value,
+                              }))
+                            }
+                            placeholder="Lead time, comments, etc."
+                            className="block w-full min-h-16 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addVariant(row.assignmentId)}
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add variant
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {err && (
@@ -400,8 +565,7 @@ export function FactoryForm({
 
       <div className="flex flex-col items-stretch justify-between gap-3 border-t pt-4 sm:flex-row sm:items-center">
         <p className="text-xs text-muted-foreground max-w-md">
-          Quote every variant, then submit once at the bottom. All variants are
-          saved together.
+          Add one or more quote options per item, then submit once at the bottom.
         </p>
         <Button
           type="submit"

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useMemo, useState, useTransition } from "react";
 import { ItemPhotos } from "@/components/items/item-photos";
-import type { Factory, Quote, QuotationStatus } from "@/lib/types";
+import type { QuotationStatus } from "@/lib/types";
 import {
   QUOTE_COLUMNS,
   quoteTotal,
@@ -13,13 +13,6 @@ import {
 import type { CompareRow } from "@/app/admin/(dash)/quotations/[id]/compare/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 import { generatePurchaseOrders, type AwardInput } from "@/app/admin/(dash)/quotations/[id]/compare/actions";
@@ -30,81 +23,51 @@ export function ComparisonTable({
   quotationId,
   quotationStatus,
   rows,
-  factories,
-  quotesByVariantAndFactory,
 }: {
   quotationId: string;
   quotationStatus: QuotationStatus;
   rows: CompareRow[];
-  factories: Factory[];
-  quotesByVariantAndFactory: Record<string, Record<string, Quote>>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [awards, setAwards] = useState<
-    Record<string, { factory_id: string; quantity: number }>
-  >(() => {
-    const initial: Record<string, { factory_id: string; quantity: number }> = {};
+  const [awards, setAwards] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {};
+    const bestByItem = new Map<string, { quoteId: string; total: number }>();
     for (const row of rows) {
-      const quotes = quotesByVariantAndFactory[row.variant.id];
-      if (!quotes) continue;
-      let best: { factoryId: string; total: number } | null = null;
-      for (const [fid, q] of Object.entries(quotes)) {
-        const t = quoteTotal(q);
-        if (t <= 0) continue;
-        if (!best || t < best.total) best = { factoryId: fid, total: t };
+      const total = quoteTotal(row.quote);
+      if (!quoteHasValue(row.quote) || row.quote.declined) continue;
+      const prev = bestByItem.get(row.item.id);
+      if (!prev || total < prev.total) {
+        bestByItem.set(row.item.id, { quoteId: row.quote.id, total });
       }
-      if (best) {
-        initial[row.variant.id] = { factory_id: best.factoryId, quantity: 1 };
-      }
+    }
+    for (const { quoteId } of bestByItem.values()) {
+      initial[quoteId] = 1;
     }
     return initial;
   });
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
-  const sortedFactories = useMemo(() => factories.slice(), [factories]);
-
   const tableRows = useMemo(() => {
-    const base = rows.map((row) => {
-      const quotes = quotesByVariantAndFactory[row.variant.id] ?? {};
-      const byFactory: Record<
-        string,
-        { quote: Quote; total: number; declined: boolean } | null
-      > = {};
-      for (const f of factories) {
-        const q = quotes[f.id];
-        byFactory[f.id] = q
-          ? {
-              quote: q,
-              total: quoteTotal(q),
-              declined: !!q.declined,
-            }
-          : null;
-      }
-      const validTotals = Object.values(byFactory).flatMap((v) =>
-        v && !v.declined && quoteHasValue(v.quote) ? [v.total] : []
-      );
-      const minTotal = validTotals.length > 0 ? Math.min(...validTotals) : null;
-      return { ...row, byFactory, minTotal };
-    });
+    const base = rows.map((row) => ({
+      ...row,
+      total: quoteTotal(row.quote),
+      hasValue: quoteHasValue(row.quote) && !row.quote.declined,
+    }));
 
     if (!sortKey) return base;
 
     const dir = sortDir === "asc" ? 1 : -1;
     return base.slice().sort((a, b) => {
       const pick = (row: (typeof base)[number]) => {
-        if (sortKey === "total") return row.minTotal ?? Infinity;
-        const f = factories[0];
-        if (!f) return Infinity;
-        const q = row.byFactory[f.id]?.quote;
-        return q && q[sortKey] !== null && q[sortKey] !== undefined
-          ? Number(q[sortKey])
-          : Infinity;
+        if (sortKey === "total") return row.hasValue ? row.total : Infinity;
+        const v = row.quote[sortKey];
+        return v !== null && v !== undefined ? Number(v) : Infinity;
       };
       return (pick(a) - pick(b)) * dir;
     });
-  }, [rows, factories, quotesByVariantAndFactory, sortKey, sortDir]);
+  }, [rows, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -119,16 +82,14 @@ export function ComparisonTable({
     setErr(null);
     const payload: AwardInput[] = tableRows
       .map((row) => {
-        const award = awards[row.variant.id];
-        if (!award) return null;
-        const quote = quotesByVariantAndFactory[row.variant.id]?.[award.factory_id];
-        if (!quote) return null;
+        const quantity = awards[row.quote.id];
+        if (!quantity || quantity < 1) return null;
         return {
           variant_id: row.variant.id,
           item_id: row.item.id,
-          factory_id: award.factory_id,
-          quote_id: quote.id,
-          quantity: award.quantity,
+          factory_id: row.factory.id,
+          quote_id: row.quote.id,
+          quantity,
         };
       })
       .filter((x): x is AwardInput => x !== null);
@@ -144,7 +105,7 @@ export function ComparisonTable({
     });
   }
 
-  const awardsCount = Object.keys(awards).length;
+  const awardsCount = Object.values(awards).filter((q) => q >= 1).length;
   const canGenerate =
     quotationStatus !== "closed" && awardsCount > 0 && !submitting;
 
@@ -155,29 +116,32 @@ export function ComparisonTable({
           <table className="w-full text-sm border-separate border-spacing-0">
             <thead>
               <tr>
-                <th className="text-left px-4 py-3 eyebrow text-[10px] sticky left-0 bg-muted/60 z-20 min-w-[260px] border-b">
-                  Item / Variant
+                <th className="text-left px-4 py-3 eyebrow text-[10px] sticky left-0 bg-muted/60 z-20 min-w-[220px] border-b">
+                  Item
+                </th>
+                <th className="text-left px-3 py-3 eyebrow text-[10px] min-w-[120px] bg-muted/60 border-b">
+                  Factory
+                </th>
+                <th className="text-left px-3 py-3 eyebrow text-[10px] min-w-[180px] bg-muted/60 border-b">
+                  Option
                 </th>
                 <SortableHeader
-                  label="Best total"
+                  label="Total"
                   active={sortKey === "total"}
                   dir={sortDir}
                   onClick={() => toggleSort("total")}
                   align="right"
                 />
-                {sortedFactories.map((f) => (
-                  <th
-                    key={f.id}
-                    className="px-3 py-3 eyebrow text-[10px] text-right min-w-[140px] bg-muted/60 border-b"
-                  >
-                    <span className="font-heading text-base normal-case tracking-normal">
-                      {f.name}
-                    </span>
-                  </th>
+                {QUOTE_COLUMNS.map((col) => (
+                  <SortableHeader
+                    key={col.key}
+                    label={col.label}
+                    active={sortKey === col.key}
+                    dir={sortDir}
+                    onClick={() => toggleSort(col.key)}
+                    align="right"
+                  />
                 ))}
-                <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[180px] bg-muted/60 border-b">
-                  Award to
-                </th>
                 <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[90px] bg-muted/60 border-b">
                   Qty
                 </th>
@@ -185,18 +149,14 @@ export function ComparisonTable({
             </thead>
             <tbody>
               {tableRows.map((row, rowIdx) => {
-                const award = awards[row.variant.id];
-                const quotingFactoryIds = sortedFactories
-                  .filter((f) => row.byFactory[f.id])
-                  .map((f) => f.id);
-
                 const rowBg = rowIdx % 2 === 0 ? "bg-background" : "bg-muted/30";
                 const prevItemId =
                   rowIdx > 0 ? tableRows[rowIdx - 1].item.id : null;
                 const showItemHeader = row.item.id !== prevItemId;
+                const qty = awards[row.quote.id] ?? "";
 
                 return (
-                  <tr key={row.variant.id} className={rowBg}>
+                  <tr key={row.quote.id} className={rowBg}>
                     <td
                       className={`px-4 py-3 sticky left-0 z-10 border-b ${rowBg}`}
                     >
@@ -216,124 +176,70 @@ export function ComparisonTable({
                               {row.item.name || "(untitled)"}
                             </div>
                           )}
-                          <div
-                            className={
-                              showItemHeader
-                                ? "text-sm text-muted-foreground mt-0.5"
-                                : "text-sm font-medium"
-                            }
-                          >
-                            {row.variant.label}
-                          </div>
-                          {row.variant.description ? (
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                              {row.variant.description}
-                            </p>
-                          ) : null}
                         </div>
                       </div>
                     </td>
+                    <td className="px-3 py-3 border-b font-medium">
+                      {row.factory.name}
+                    </td>
+                    <td className="px-3 py-3 border-b">
+                      <div className="font-medium">{row.variant.label}</div>
+                      {row.variant.description ? (
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          {row.variant.description}
+                        </p>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-3 text-right font-heading text-lg tabular-nums border-b">
-                      {row.minTotal !== null ? (
-                        fmt(row.minTotal)
+                      {!row.hasValue ? (
+                        row.quote.declined ? (
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em]">
+                            Declined
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        fmt(row.total)
                       )}
                     </td>
-                    {sortedFactories.map((f) => {
-                      const cell = row.byFactory[f.id];
-                      const isMin =
-                        cell !== null &&
-                        cell !== undefined &&
-                        !cell.declined &&
-                        row.minTotal !== null &&
-                        cell.total === row.minTotal;
-                      return (
-                        <td
-                          key={f.id}
-                          className={`px-3 py-3 text-right tabular-nums border-b ${
-                            isMin
-                              ? "bg-green-50 dark:bg-green-950/30 font-semibold text-green-900 dark:text-green-100"
-                              : ""
-                          }`}
-                        >
-                          {!cell ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : cell.declined ? (
-                            <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em]">
-                              Declined
-                            </span>
-                          ) : (
-                            <div title={breakdown(cell.quote)}>
-                              {fmt(cell.total)}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="px-3 py-3 border-b">
-                      {quotingFactoryIds.length > 0 ? (
-                        <Select
-                          value={award?.factory_id ?? ""}
-                          onValueChange={(v) =>
+                    {QUOTE_COLUMNS.map((col) => (
+                      <td
+                        key={col.key}
+                        className="px-3 py-3 text-right tabular-nums border-b text-muted-foreground"
+                      >
+                        {row.quote[col.key] !== null &&
+                        row.quote[col.key] !== undefined
+                          ? fmt(Number(row.quote[col.key]))
+                          : "—"}
+                      </td>
+                    ))}
+                    <td className="px-3 py-3 text-right border-b">
+                      {row.hasValue ? (
+                        <Input
+                          type="number"
+                          min="0"
+                          className="h-9 w-20 ml-auto text-right tabular-nums"
+                          value={qty}
+                          onChange={(e) => {
+                            const raw = e.target.value;
                             setAwards((prev) => {
                               const next = { ...prev };
-                              if (!v) delete next[row.variant.id];
-                              else
-                                next[row.variant.id] = {
-                                  factory_id: v,
-                                  quantity: prev[row.variant.id]?.quantity ?? 1,
-                                };
-                              return next;
-                            })
-                          }
-                        >
-                          <SelectTrigger className="h-9 min-w-[140px]">
-                            <SelectValue placeholder="No winner">
-                              {(v: unknown): React.ReactNode =>
-                                (typeof v === "string" &&
-                                  v &&
-                                  sortedFactories.find((x) => x.id === v)
-                                    ?.name) ||
-                                "No winner"
+                              if (!raw || Number(raw) < 1) {
+                                delete next[row.quote.id];
+                              } else {
+                                next[row.quote.id] = Math.max(
+                                  1,
+                                  Number(raw) || 1
+                                );
                               }
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {quotingFactoryIds.map((fid) => {
-                              const f = sortedFactories.find((x) => x.id === fid)!;
-                              return (
-                                <SelectItem key={fid} value={fid}>
-                                  {f.name}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
+                              return next;
+                            });
+                          }}
+                        />
                       ) : (
-                        <Badge variant="outline">No quotes</Badge>
+                        <Badge variant="outline">—</Badge>
                       )}
-                    </td>
-                    <td className="px-3 py-3 text-right border-b">
-                      <Input
-                        type="number"
-                        min="1"
-                        className="h-9 w-20 ml-auto text-right tabular-nums"
-                        disabled={!award}
-                        value={award?.quantity ?? ""}
-                        onChange={(e) => {
-                          const q = Math.max(1, Number(e.target.value) || 1);
-                          setAwards((prev) => ({
-                            ...prev,
-                            [row.variant.id]: {
-                              factory_id:
-                                prev[row.variant.id]?.factory_id ??
-                                quotingFactoryIds[0],
-                              quantity: q,
-                            },
-                          }));
-                        }}
-                      />
                     </td>
                   </tr>
                 );
@@ -353,7 +259,7 @@ export function ComparisonTable({
       ) : (
         <div className="flex items-center justify-end gap-3 sticky bottom-0 bg-background pt-4 border-t">
           <p className="text-sm text-muted-foreground">
-            {awardsCount} variant{awardsCount !== 1 ? "s" : ""} selected
+            {awardsCount} option{awardsCount !== 1 ? "s" : ""} selected
           </p>
           <Button size="lg" onClick={handleGenerate} disabled={!canGenerate}>
             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -380,7 +286,7 @@ function SortableHeader({
 }) {
   return (
     <th
-      className={`px-3 py-3 min-w-[130px] bg-muted/60 border-b text-${align}`}
+      className={`px-3 py-3 min-w-[100px] bg-muted/60 border-b text-${align}`}
     >
       <button
         type="button"
@@ -406,11 +312,4 @@ function SortableHeader({
 
 function fmt(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-function breakdown(q: Quote): string {
-  return QUOTE_COLUMNS.map((c) => {
-    const v = q[c.key];
-    return `${c.label}: ${v ?? "—"}`;
-  }).join("\n");
 }

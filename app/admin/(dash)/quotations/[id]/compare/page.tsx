@@ -10,7 +10,6 @@ import type {
   Quotation,
   ItemAssignment,
 } from "@/lib/types";
-import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { ComparisonTable } from "@/components/quotations/comparison-table";
 import { PageHeader } from "@/components/admin/page-header";
@@ -18,6 +17,8 @@ import { PageHeader } from "@/components/admin/page-header";
 export type CompareRow = {
   item: Item;
   variant: ItemVariant;
+  factory: Factory;
+  quote: Quote;
 };
 
 export default async function ComparePage({
@@ -44,27 +45,7 @@ export default async function ComparePage({
   const quotation = qRes.data as Quotation | null;
   if (!quotation) notFound();
   const items: Item[] = itemsRes.data ?? [];
-  const itemIds = items.map((i) => i.id);
-
-  const { data: variantsData } =
-    itemIds.length > 0
-      ? await supabase
-          .from("item_variants")
-          .select("*")
-          .in("item_id", itemIds)
-          .order("position", { ascending: true })
-      : { data: [] as ItemVariant[] };
-
-  const variantsByItem = new Map<string, ItemVariant[]>();
-  for (const v of (variantsData ?? []) as ItemVariant[]) {
-    const list = variantsByItem.get(v.item_id) ?? [];
-    list.push(v);
-    variantsByItem.set(v.item_id, list);
-  }
-
-  const compareRows: CompareRow[] = items.flatMap((item) =>
-    (variantsByItem.get(item.id) ?? []).map((variant) => ({ item, variant }))
-  );
+  const itemsById = new Map(items.map((i) => [i.id, i]));
 
   type QfShape = QuotationFactory & {
     factory: Factory | Factory[];
@@ -72,22 +53,48 @@ export default async function ComparePage({
   };
   const qfs = ((qfRes.data ?? []) as unknown as QfShape[]).map((qf) => {
     const factory = Array.isArray(qf.factory) ? qf.factory[0] : qf.factory;
-    return { id: qf.id, factory, accepted_at: qf.accepted_at, assignments: qf.item_assignments };
+    return {
+      id: qf.id,
+      factory,
+      accepted_at: qf.accepted_at,
+      assignments: qf.item_assignments,
+    };
   });
 
-  const quotesByVariantAndFactory = new Map<string, Map<string, Quote>>();
+  const assignmentIds = qfs.flatMap((qf) => qf.assignments.map((a) => a.id));
+  const { data: variantsData } =
+    assignmentIds.length > 0
+      ? await supabase
+          .from("item_variants")
+          .select("*")
+          .in("item_assignment_id", assignmentIds)
+      : { data: [] as ItemVariant[] };
+
+  const variantsById = new Map(
+    ((variantsData ?? []) as ItemVariant[]).map((v) => [v.id, v])
+  );
+
+  const compareRows: CompareRow[] = [];
   for (const qf of qfs) {
     for (const a of qf.assignments) {
+      const item = itemsById.get(a.item_id);
+      if (!item) continue;
       const quotes = Array.isArray(a.quotes) ? a.quotes : a.quotes ? [a.quotes] : [];
       for (const quote of quotes) {
-        const inner =
-          quotesByVariantAndFactory.get(quote.variant_id) ??
-          new Map<string, Quote>();
-        inner.set(qf.factory.id, quote);
-        quotesByVariantAndFactory.set(quote.variant_id, inner);
+        const variant = variantsById.get(quote.variant_id);
+        if (!variant) continue;
+        compareRows.push({ item, variant, factory: qf.factory, quote });
       }
     }
   }
+
+  compareRows.sort((a, b) => {
+    const itemCmp = a.item.name?.localeCompare(b.item.name ?? "") ?? 0;
+    if (itemCmp !== 0) return itemCmp;
+    const factoryCmp = a.factory.name.localeCompare(b.factory.name);
+    if (factoryCmp !== 0) return factoryCmp;
+    return a.variant.position - b.variant.position;
+  });
 
   const participatingFactories = qfs.map((qf) => qf.factory);
 
@@ -104,27 +111,21 @@ export default async function ComparePage({
       <PageHeader
         eyebrow="Comparison"
         title={quotation.title}
-        description="Each row is a quote variant. Pick a winner and quantity per variant, then generate purchase orders."
+        description="Each row is a factory quote option. Pick winners and quantities, then generate purchase orders."
       />
 
       {participatingFactories.length === 0 ? (
         <p className="text-sm text-muted-foreground">No factories assigned.</p>
       ) : compareRows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No variants defined on items yet.
+          No quotes submitted yet. Factories add their own options on the quote
+          form.
         </p>
       ) : (
         <ComparisonTable
           quotationId={id}
           quotationStatus={quotation.status}
           rows={compareRows}
-          factories={participatingFactories}
-          quotesByVariantAndFactory={Object.fromEntries(
-            Array.from(quotesByVariantAndFactory.entries()).map(([variantId, m]) => [
-              variantId,
-              Object.fromEntries(m),
-            ])
-          )}
         />
       )}
     </div>

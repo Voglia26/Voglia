@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Item, ItemWithVariants, Factory, QuotationFactory, ItemAssignment, Quotation, ItemVariant } from "@/lib/types";
+import type { Item, Factory, QuotationFactory, ItemAssignment, Quotation } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -24,7 +24,7 @@ export default async function QuotationEditorPage({
     supabase.from("quotations").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("items")
-      .select("*, item_variants(*)")
+      .select("*")
       .eq("quotation_id", id)
       .order("created_at", { ascending: true }),
     supabase.from("factories").select("*").order("name", { ascending: true }),
@@ -37,11 +37,7 @@ export default async function QuotationEditorPage({
   const quotation = qRes.data as Quotation | null;
   if (!quotation) notFound();
 
-  const items: ItemWithVariants[] = (itemsRes.data ?? []).map((raw) => {
-    const row = raw as Item & { item_variants: ItemVariant[] | null };
-    const variants = (row.item_variants ?? []).slice().sort((a, b) => a.position - b.position);
-    return { ...row, variants };
-  });
+  const items: Item[] = itemsRes.data ?? [];
   const factories: Factory[] = factoriesRes.data ?? [];
   const qfsRaw = (qfRes.data ?? []) as (QuotationFactory & {
     item_assignments: ItemAssignment[];

@@ -1,11 +1,13 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { QUOTE_COLUMNS, type QuoteColumnKey } from "@/lib/types";
+import type { QuoteColumnKey } from "@/lib/types";
 
-export type QuoteInput = {
+export type VariantQuoteInput = {
   assignmentId: string;
   variantId: string;
+  label: string;
+  description: string;
   values: Partial<Record<QuoteColumnKey, number | null>>;
   final_price?: number | null;
   declined?: boolean;
@@ -14,9 +16,52 @@ export type QuoteInput = {
   product_description?: string | null;
 };
 
+async function syncAssignmentVariants(
+  supabase: ReturnType<typeof createAdminClient>,
+  assignmentId: string,
+  variants: { id: string; label: string; description: string; position: number }[]
+) {
+  const { data: existing } = await supabase
+    .from("item_variants")
+    .select("id")
+    .eq("item_assignment_id", assignmentId);
+
+  const keepIds = new Set(variants.map((v) => v.id));
+  for (const row of existing ?? []) {
+    if (!keepIds.has(row.id)) {
+      await supabase.from("item_variants").delete().eq("id", row.id);
+    }
+  }
+
+  for (let i = 0; i < variants.length; i++) {
+    const v = variants[i];
+    const payload = {
+      item_assignment_id: assignmentId,
+      label: v.label,
+      description: v.description || null,
+      position: i,
+    };
+    const { data: found } = await supabase
+      .from("item_variants")
+      .select("id")
+      .eq("id", v.id)
+      .maybeSingle();
+
+    if (found) {
+      await supabase
+        .from("item_variants")
+        .update(payload)
+        .eq("id", v.id)
+        .eq("item_assignment_id", assignmentId);
+    } else {
+      await supabase.from("item_variants").insert({ id: v.id, ...payload });
+    }
+  }
+}
+
 export async function submitFactoryQuotation(
   token: string,
-  inputs: QuoteInput[]
+  inputs: VariantQuoteInput[]
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = createAdminClient();
 
@@ -30,33 +75,44 @@ export async function submitFactoryQuotation(
 
   const { data: assignRows } = await supabase
     .from("item_assignments")
-    .select("id, item_id")
+    .select("id")
     .eq("quotation_factory_id", qf.id);
 
-  const assignmentById = new Map(
-    (assignRows ?? []).map((r) => [r.id, r.item_id] as const)
-  );
+  const validAssignmentIds = new Set((assignRows ?? []).map((r) => r.id));
 
-  const itemIds = [...new Set((assignRows ?? []).map((r) => r.item_id))];
-  const { data: variantRows } =
-    itemIds.length > 0
-      ? await supabase
-          .from("item_variants")
-          .select("id, item_id")
-          .in("item_id", itemIds)
-      : { data: [] as { id: string; item_id: string }[] };
+  const filtered = inputs.filter((i) => validAssignmentIds.has(i.assignmentId));
 
-  const validPairs = new Set<string>();
-  for (const v of variantRows ?? []) {
-    validPairs.add(`${v.item_id}:${v.id}`);
+  const variantsByAssignment = new Map<
+    string,
+    { id: string; label: string; description: string; position: number }[]
+  >();
+  for (const input of filtered) {
+    const label = input.label.trim();
+    if (!label) continue;
+    const list = variantsByAssignment.get(input.assignmentId) ?? [];
+    if (!list.some((v) => v.id === input.variantId)) {
+      list.push({
+        id: input.variantId,
+        label,
+        description: input.description.trim(),
+        position: list.length,
+      });
+      variantsByAssignment.set(input.assignmentId, list);
+    }
   }
 
-  const rows = inputs
-    .filter((i) => assignmentById.has(i.assignmentId))
-    .filter((i) => {
-      const itemId = assignmentById.get(i.assignmentId)!;
-      return validPairs.has(`${itemId}:${i.variantId}`);
-    })
+  for (const [assignmentId, variants] of variantsByAssignment) {
+    await syncAssignmentVariants(supabase, assignmentId, variants);
+  }
+
+  for (const assignmentId of validAssignmentIds) {
+    if (!variantsByAssignment.has(assignmentId)) {
+      await syncAssignmentVariants(supabase, assignmentId, []);
+    }
+  }
+
+  const quoteRows = filtered
+    .filter((i) => i.label.trim())
     .map((i) => ({
       item_assignment_id: i.assignmentId,
       variant_id: i.variantId,
@@ -76,10 +132,10 @@ export async function submitFactoryQuotation(
       submitted_at: new Date().toISOString(),
     }));
 
-  if (rows.length > 0) {
+  if (quoteRows.length > 0) {
     const { error } = await supabase
       .from("quotes")
-      .upsert(rows, { onConflict: "item_assignment_id,variant_id" });
+      .upsert(quoteRows, { onConflict: "item_assignment_id,variant_id" });
     if (error) return { ok: false, error: error.message };
   }
 

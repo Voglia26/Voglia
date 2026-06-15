@@ -23,10 +23,9 @@ insert into items (id, quotation_id, name, sku, description, specs, photo_urls, 
 insert into items (id, quotation_id, name, sku, description, specs, photo_urls, position, created_at) values ('b4fae920-adc0-4294-a2ac-6929e9cdedc9', '529b4658-9a79-4807-bd7a-2a09c2ed5510', 'Item 2', NULL, NULL, NULL, '{}', 0, '2026-04-24T19:38:04.195503+00:00') on conflict (id) do nothing;
 insert into items (id, quotation_id, name, sku, description, specs, photo_urls, position, created_at) values ('a15cfcb7-5e9a-40ea-ab40-c9a30765ad52', 'd855a952-eccb-42a6-aba9-74ba7fa49176', 'Gold Stripped Necklace', NULL, NULL, '{"carats":3.2,"weight_g":16,"gold_type":null,"stone_type":"Natural Diamond"}'::jsonb, array['https://qcpxawihlouhprlljfyc.supabase.co/storage/v1/object/public/items/1f062be7-7a6c-4661-baed-ef1377027b3e.webp'], 0, '2026-04-24T20:09:45.601498+00:00') on conflict (id) do nothing;
 
--- item_variants: one Standard variant per item (required after 20260606120000 migration)
-insert into item_variants (id, item_id, label, description, position) values ('a1000001-0000-4000-8000-000000000001', '5b9e3fb8-87a8-423b-a112-3f6b6e84c738', 'Standard', NULL, 0) on conflict (id) do nothing;
-insert into item_variants (id, item_id, label, description, position) values ('a1000001-0000-4000-8000-000000000002', 'b4fae920-adc0-4294-a2ac-6929e9cdedc9', 'Standard', NULL, 0) on conflict (id) do nothing;
-insert into item_variants (id, item_id, label, description, position) values ('a1000001-0000-4000-8000-000000000003', 'a15cfcb7-5e9a-40ea-ab40-c9a30765ad52', 'Standard', NULL, 0) on conflict (id) do nothing;
+-- item_variants: factory-owned options per assignment (created on the quote form)
+insert into item_variants (id, item_assignment_id, label, description, position) values ('a1000001-0000-4000-8000-000000000001', 'f1d31945-56f8-4895-ba4d-18183e9f9ebe', 'Standard', NULL, 0) on conflict (id) do nothing;
+insert into item_variants (id, item_assignment_id, label, description, position) values ('a1000001-0000-4000-8000-000000000003', 'fc49421c-6697-4d52-98e0-df45f7b87bae', 'Standard', NULL, 0) on conflict (id) do nothing;
 
 -- quotation_factories: 3 rows
 insert into quotation_factories (id, quotation_id, factory_id, token, accepted_at, created_at) values ('c15fc5a2-33c6-4d95-bb6a-814b6d57429c', '529b4658-9a79-4807-bd7a-2a09c2ed5510', '5513897d-ee38-45c2-81c8-febad5b5a205', '17d47d78-1585-4240-b17b-7ecaf17d3257', NULL, '2026-04-24T19:39:33.038283+00:00') on conflict (id) do nothing;
