@@ -23,9 +23,9 @@ insert into items (id, quotation_id, name, sku, description, specs, photo_urls, 
 insert into items (id, quotation_id, name, sku, description, specs, photo_urls, position, created_at) values ('b4fae920-adc0-4294-a2ac-6929e9cdedc9', '529b4658-9a79-4807-bd7a-2a09c2ed5510', 'Item 2', NULL, NULL, NULL, '{}', 0, '2026-04-24T19:38:04.195503+00:00') on conflict (id) do nothing;
 insert into items (id, quotation_id, name, sku, description, specs, photo_urls, position, created_at) values ('a15cfcb7-5e9a-40ea-ab40-c9a30765ad52', 'd855a952-eccb-42a6-aba9-74ba7fa49176', 'Gold Stripped Necklace', NULL, NULL, '{"carats":3.2,"weight_g":16,"gold_type":null,"stone_type":"Natural Diamond"}'::jsonb, array['https://qcpxawihlouhprlljfyc.supabase.co/storage/v1/object/public/items/1f062be7-7a6c-4661-baed-ef1377027b3e.webp'], 0, '2026-04-24T20:09:45.601498+00:00') on conflict (id) do nothing;
 
--- item_variants: factory-owned options per assignment (created on the quote form)
-insert into item_variants (id, item_assignment_id, label, description, position) values ('a1000001-0000-4000-8000-000000000001', 'f1d31945-56f8-4895-ba4d-18183e9f9ebe', 'Standard', NULL, 0) on conflict (id) do nothing;
-insert into item_variants (id, item_assignment_id, label, description, position) values ('a1000001-0000-4000-8000-000000000003', 'fc49421c-6697-4d52-98e0-df45f7b87bae', 'Standard', NULL, 0) on conflict (id) do nothing;
+-- item reference variants (admin suggestions on items)
+insert into item_variants (id, item_id, item_assignment_id, label, description, position) values ('b1000001-0000-4000-8000-000000000001', 'a15cfcb7-5e9a-40ea-ab40-c9a30765ad52', NULL, 'With normal diamonds', NULL, 0) on conflict (id) do nothing;
+insert into item_variants (id, item_id, item_assignment_id, label, description, position) values ('b1000001-0000-4000-8000-000000000002', 'a15cfcb7-5e9a-40ea-ab40-c9a30765ad52', NULL, 'With turquoises', 'Turquoise cabochons instead of diamonds', 1) on conflict (id) do nothing;
 
 -- quotation_factories: 3 rows
 insert into quotation_factories (id, quotation_id, factory_id, token, accepted_at, created_at) values ('c15fc5a2-33c6-4d95-bb6a-814b6d57429c', '529b4658-9a79-4807-bd7a-2a09c2ed5510', '5513897d-ee38-45c2-81c8-febad5b5a205', '17d47d78-1585-4240-b17b-7ecaf17d3257', NULL, '2026-04-24T19:39:33.038283+00:00') on conflict (id) do nothing;
@@ -37,6 +37,10 @@ insert into item_assignments (id, quotation_factory_id, item_id) values ('f1d319
 insert into item_assignments (id, quotation_factory_id, item_id) values ('5159de0a-b6df-49de-b783-de8dd3be51f8', 'd85b035e-b817-486f-b9ed-8ab5b0f85df3', 'b4fae920-adc0-4294-a2ac-6929e9cdedc9') on conflict (id) do nothing;
 insert into item_assignments (id, quotation_factory_id, item_id) values ('0bdbf71e-bb1c-4f2b-b4fc-5e61cf6be2b0', 'c15fc5a2-33c6-4d95-bb6a-814b6d57429c', 'b4fae920-adc0-4294-a2ac-6929e9cdedc9') on conflict (id) do nothing;
 insert into item_assignments (id, quotation_factory_id, item_id) values ('fc49421c-6697-4d52-98e0-df45f7b87bae', '7bf8ff87-7658-4412-b994-06344468ccd0', 'a15cfcb7-5e9a-40ea-ab40-c9a30765ad52') on conflict (id) do nothing;
+
+-- item_variants: factory quote options per assignment
+insert into item_variants (id, item_id, item_assignment_id, label, description, position) values ('a1000001-0000-4000-8000-000000000001', NULL, 'f1d31945-56f8-4895-ba4d-18183e9f9ebe', 'Standard', NULL, 0) on conflict (id) do nothing;
+insert into item_variants (id, item_id, item_assignment_id, label, description, position) values ('a1000001-0000-4000-8000-000000000003', NULL, 'fc49421c-6697-4d52-98e0-df45f7b87bae', 'Standard', NULL, 0) on conflict (id) do nothing;
 
 -- quotes: 2 rows
 insert into quotes (id, item_assignment_id, variant_id, gold_loss, total_gold_cost, diamond_cost, cost_per_carat, labor, other_fees, notes, submitted_at, declined, final_price) values ('44756bb1-751e-498b-891f-7d34e8a5d8f6', 'f1d31945-56f8-4895-ba4d-18183e9f9ebe', 'a1000001-0000-4000-8000-000000000001', 12, 76, NULL, NULL, NULL, NULL, NULL, '2026-04-24T19:41:04.145792+00:00', FALSE, NULL) on conflict (id) do nothing;

@@ -26,6 +26,7 @@ export type FactoryFormRow = {
   assignmentId: string;
   item: Item;
   variants: ItemVariant[];
+  referenceVariants: Array<{ label: string; description: string | null }>;
   quotesByVariantId: Record<string, Quote | null>;
 };
 
@@ -53,13 +54,27 @@ function costFieldName(
 function initialVariantsByAssignment(rows: FactoryFormRow[]) {
   const out: Record<string, LocalVariant[]> = {};
   for (const row of rows) {
-    out[row.assignmentId] = row.variants.map((v) => ({
-      id: v.id,
-      label: v.label,
-      description: v.description ?? "",
-    }));
+    if (row.variants.length > 0) {
+      out[row.assignmentId] = row.variants.map((v) => ({
+        id: v.id,
+        label: v.label,
+        description: v.description ?? "",
+      }));
+    } else if (row.referenceVariants.length > 0) {
+      out[row.assignmentId] = row.referenceVariants.map((v) => ({
+        id: crypto.randomUUID(),
+        label: v.label,
+        description: v.description ?? "",
+      }));
+    } else {
+      out[row.assignmentId] = [];
+    }
   }
   return out;
+}
+
+function rowUsesReferenceSeed(row: FactoryFormRow) {
+  return row.variants.length === 0 && row.referenceVariants.length > 0;
 }
 
 function initialFormState(rows: FactoryFormRow[]) {
@@ -324,6 +339,12 @@ export function FactoryForm({
               </Card>
 
               <div className="space-y-4 border-t border-border pt-5">
+                {rowUsesReferenceSeed(row) && variants.length > 0 && (
+                  <p className="text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2">
+                    Suggested options from the client — edit names, prices, or add
+                    more variants below.
+                  </p>
+                )}
                 {variants.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No quote options yet. Add one to start quoting this item.

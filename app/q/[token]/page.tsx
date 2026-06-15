@@ -43,7 +43,11 @@ export default async function FactoryQuotePage({
   const assignmentIds = assignments.map((a) => a.id);
   const itemIds = [...new Set(assignments.map((a) => a.item_id))];
 
-  const [{ data: itemsData }, { data: variantsData }] = await Promise.all([
+  const [
+    { data: itemsData },
+    { data: assignmentVariantsData },
+    { data: referenceVariantsData },
+  ] = await Promise.all([
     itemIds.length > 0
       ? supabase.from("items").select("*").in("id", itemIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
@@ -52,6 +56,14 @@ export default async function FactoryQuotePage({
           .from("item_variants")
           .select("*")
           .in("item_assignment_id", assignmentIds)
+          .order("position", { ascending: true })
+      : Promise.resolve({ data: [] as ItemVariant[] }),
+    itemIds.length > 0
+      ? supabase
+          .from("item_variants")
+          .select("*")
+          .in("item_id", itemIds)
+          .is("item_assignment_id", null)
           .order("position", { ascending: true })
       : Promise.resolve({ data: [] as ItemVariant[] }),
   ]);
@@ -64,10 +76,19 @@ export default async function FactoryQuotePage({
   );
 
   const variantsByAssignment = new Map<string, ItemVariant[]>();
-  for (const v of (variantsData ?? []) as ItemVariant[]) {
+  for (const v of (assignmentVariantsData ?? []) as ItemVariant[]) {
+    if (!v.item_assignment_id) continue;
     const list = variantsByAssignment.get(v.item_assignment_id) ?? [];
     list.push(v);
     variantsByAssignment.set(v.item_assignment_id, list);
+  }
+
+  const referenceByItem = new Map<string, ItemVariant[]>();
+  for (const v of (referenceVariantsData ?? []) as ItemVariant[]) {
+    if (!v.item_id) continue;
+    const list = referenceByItem.get(v.item_id) ?? [];
+    list.push(v);
+    referenceByItem.set(v.item_id, list);
   }
 
   const rows = assignments
@@ -80,10 +101,15 @@ export default async function FactoryQuotePage({
         quotesByVariantId[q.variant_id] = q;
       }
       const variants = variantsByAssignment.get(a.id) ?? [];
+      const referenceVariants = (referenceByItem.get(a.item_id) ?? []).map((v) => ({
+        label: v.label,
+        description: v.description,
+      }));
       return {
         assignmentId: a.id,
         item,
         variants,
+        referenceVariants,
         quotesByVariantId,
       };
     })
@@ -94,6 +120,7 @@ export default async function FactoryQuotePage({
         assignmentId: string;
         item: Item;
         variants: ItemVariant[];
+        referenceVariants: Array<{ label: string; description: string | null }>;
         quotesByVariantId: Record<string, Quote | null>;
       } => !!r
     );
@@ -120,7 +147,7 @@ export default async function FactoryQuotePage({
             </span>
             {alreadySubmitted
               ? " · Update your quote below and resubmit."
-              : " · Add quote options for each item and submit when ready."}
+              : " · Quote each option below (suggested options are preloaded when provided)."}
           </p>
         </header>
 

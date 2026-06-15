@@ -61,11 +61,16 @@ export type Item = {
 
 export type ItemVariant = {
   id: string;
-  item_assignment_id: string;
+  item_id: string | null;
+  item_assignment_id: string | null;
   label: string;
   description: string | null;
   position: number;
   created_at: string;
+};
+
+export type ItemWithVariants = Item & {
+  reference_variants: ItemVariant[];
 };
 
 export type QuotationFactory = {
