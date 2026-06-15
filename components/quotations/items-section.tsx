@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Item } from "@/lib/types";
+import type { ItemWithVariants } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,16 +19,17 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { PhotoUpload } from "@/components/items/photo-upload";
 import { ItemPhotos } from "@/components/items/item-photos";
 import { addItem, updateItem, deleteItem } from "@/app/admin/(dash)/quotations/[id]/actions";
+import { VariantsField } from "@/components/quotations/variants-field";
 
 export function ItemsSection({
   quotationId,
   items,
 }: {
   quotationId: string;
-  items: Item[];
+  items: ItemWithVariants[];
 }) {
   const [addOpen, setAddOpen] = useState(false);
-  const [editing, setEditing] = useState<Item | null>(null);
+  const [editing, setEditing] = useState<ItemWithVariants | null>(null);
 
   return (
     <>
@@ -47,6 +48,12 @@ export function ItemsSection({
                 {item.description && (
                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                     {item.description}
+                  </p>
+                )}
+                {item.variants.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {item.variants.length} variant
+                    {item.variants.length !== 1 ? "s" : ""}
                   </p>
                 )}
                 <div className="mt-2 flex gap-1">
@@ -138,7 +145,7 @@ function ItemForm({
   submitLabel,
 }: {
   quotationId: string;
-  item?: Item;
+  item?: ItemWithVariants;
   onSubmit: (fd: FormData) => Promise<void>;
   submitLabel: string;
 }) {
@@ -221,6 +228,8 @@ function ItemForm({
           </div>
         </div>
       </div>
+
+      <VariantsField defaultVariants={item?.variants} />
       </div>
 
       <DialogFooter className="sticky bottom-0 z-10 shrink-0 border-t bg-popover px-4 py-4 mx-0 mb-0 mt-0 rounded-none sm:justify-end">

@@ -5,6 +5,7 @@ import { QUOTE_COLUMNS, type QuoteColumnKey } from "@/lib/types";
 
 export type QuoteInput = {
   assignmentId: string;
+  variantId: string;
   values: Partial<Record<QuoteColumnKey, number | null>>;
   final_price?: number | null;
   declined?: boolean;
@@ -29,15 +30,36 @@ export async function submitFactoryQuotation(
 
   const { data: assignRows } = await supabase
     .from("item_assignments")
-    .select("id")
+    .select("id, item_id")
     .eq("quotation_factory_id", qf.id);
 
-  const validIds = new Set((assignRows ?? []).map((r) => r.id));
+  const assignmentById = new Map(
+    (assignRows ?? []).map((r) => [r.id, r.item_id] as const)
+  );
+
+  const itemIds = [...new Set((assignRows ?? []).map((r) => r.item_id))];
+  const { data: variantRows } =
+    itemIds.length > 0
+      ? await supabase
+          .from("item_variants")
+          .select("id, item_id")
+          .in("item_id", itemIds)
+      : { data: [] as { id: string; item_id: string }[] };
+
+  const validPairs = new Set<string>();
+  for (const v of variantRows ?? []) {
+    validPairs.add(`${v.item_id}:${v.id}`);
+  }
 
   const rows = inputs
-    .filter((i) => validIds.has(i.assignmentId))
+    .filter((i) => assignmentById.has(i.assignmentId))
+    .filter((i) => {
+      const itemId = assignmentById.get(i.assignmentId)!;
+      return validPairs.has(`${itemId}:${i.variantId}`);
+    })
     .map((i) => ({
       item_assignment_id: i.assignmentId,
+      variant_id: i.variantId,
       gold_loss: i.declined ? null : i.values.gold_loss ?? null,
       total_gold_cost: i.declined ? null : i.values.total_gold_cost ?? null,
       diamond_cost: i.declined ? null : i.values.diamond_cost ?? null,
@@ -57,7 +79,7 @@ export async function submitFactoryQuotation(
   if (rows.length > 0) {
     const { error } = await supabase
       .from("quotes")
-      .upsert(rows, { onConflict: "item_assignment_id" });
+      .upsert(rows, { onConflict: "item_assignment_id,variant_id" });
     if (error) return { ok: false, error: error.message };
   }
 

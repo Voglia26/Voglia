@@ -42,6 +42,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   itemName: { fontSize: 12, fontWeight: 700 },
+  variantLabel: { fontSize: 10, fontWeight: 600, marginTop: 2 },
+  variantDesc: { color: "#666", fontSize: 8, marginTop: 1 },
   qty: { fontSize: 14, fontWeight: 700 },
   sku: { color: "#666", fontSize: 8 },
   specs: { color: "#555", fontSize: 9, marginTop: 2 },
@@ -152,6 +154,20 @@ export async function GET(
                   { style: styles.itemName },
                   pi.item.name || "(untitled)"
                 ),
+                pi.variant
+                  ? React.createElement(
+                      Text,
+                      { style: styles.variantLabel },
+                      `Variant: ${pi.variant.label}`
+                    )
+                  : null,
+                pi.variant?.description
+                  ? React.createElement(
+                      Text,
+                      { style: styles.variantDesc },
+                      pi.variant.description
+                    )
+                  : null,
                 pi.item.sku
                   ? React.createElement(Text, { style: styles.sku }, `SKU: ${pi.item.sku}`)
                   : null

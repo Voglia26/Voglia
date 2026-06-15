@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeItem } from "@/lib/items";
-import type { Item, Quote } from "@/lib/types";
+import type { Item, ItemVariant, Quote } from "@/lib/types";
 import { FactoryForm } from "@/components/public/factory-form";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2 } from "lucide-react";
@@ -42,10 +42,18 @@ export default async function FactoryQuotePage({
   const assignments = (assignRows ?? []) as AssignmentRow[];
   const itemIds = [...new Set(assignments.map((a) => a.item_id))];
 
-  const { data: itemsData } =
+  const [{ data: itemsData }, { data: variantsData }] = await Promise.all([
     itemIds.length > 0
-      ? await supabase.from("items").select("*").in("id", itemIds)
-      : { data: [] as Record<string, unknown>[] };
+      ? supabase.from("items").select("*").in("id", itemIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    itemIds.length > 0
+      ? supabase
+          .from("item_variants")
+          .select("*")
+          .in("item_id", itemIds)
+          .order("position", { ascending: true })
+      : Promise.resolve({ data: [] as ItemVariant[] }),
+  ]);
 
   const itemMap = new Map(
     (itemsData ?? []).map((raw) => {
@@ -54,14 +62,40 @@ export default async function FactoryQuotePage({
     })
   );
 
+  const variantsByItem = new Map<string, ItemVariant[]>();
+  for (const v of (variantsData ?? []) as ItemVariant[]) {
+    const list = variantsByItem.get(v.item_id) ?? [];
+    list.push(v);
+    variantsByItem.set(v.item_id, list);
+  }
+
   const rows = assignments
     .map((a) => {
       const item = itemMap.get(a.item_id);
       if (!item) return null;
-      const quote = Array.isArray(a.quotes) ? a.quotes[0] ?? null : a.quotes;
-      return { id: a.id, item, quote };
+      const quotes = Array.isArray(a.quotes) ? a.quotes : a.quotes ? [a.quotes] : [];
+      const quotesByVariantId: Record<string, Quote | null> = {};
+      for (const q of quotes) {
+        quotesByVariantId[q.variant_id] = q;
+      }
+      const variants = variantsByItem.get(a.item_id) ?? [];
+      return {
+        assignmentId: a.id,
+        item,
+        variants,
+        quotesByVariantId,
+      };
     })
-    .filter((r): r is { id: string; item: Item; quote: Quote | null } => !!r);
+    .filter(
+      (
+        r
+      ): r is {
+        assignmentId: string;
+        item: Item;
+        variants: ItemVariant[];
+        quotesByVariantId: Record<string, Quote | null>;
+      } => !!r && r.variants.length > 0
+    );
 
   const alreadySubmitted = !!qf.accepted_at;
 
@@ -85,7 +119,7 @@ export default async function FactoryQuotePage({
             </span>
             {alreadySubmitted
               ? " · Update your quote below and resubmit."
-              : " · Please quote the items below."}
+              : " · Please quote each variant below."}
           </p>
         </header>
 
@@ -115,11 +149,7 @@ export default async function FactoryQuotePage({
           <FactoryForm
             token={token}
             alreadySubmitted={alreadySubmitted}
-            items={rows.map((r) => ({
-              assignmentId: r.id,
-              item: r.item,
-              quote: r.quote,
-            }))}
+            rows={rows}
           />
         )}
       </div>

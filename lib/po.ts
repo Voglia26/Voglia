@@ -1,11 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Item, Quote, PurchaseOrder, Factory, Quotation } from "@/lib/types";
+import type { Item, ItemVariant, Quote, PurchaseOrder, Factory, Quotation } from "@/lib/types";
 
 export type POItemDetail = {
   id: string;
   quantity: number;
   item: Item;
   quote: Quote;
+  variant: ItemVariant | null;
 };
 
 export type POView = {
@@ -34,7 +35,7 @@ async function loadPurchaseOrder(
   let query = supabase
     .from("purchase_orders")
     .select(
-      "*, factory:factories(*), quotation:quotations(*), purchase_order_items(id, quantity, item:items(*), quote:quotes(*))"
+      "*, factory:factories(*), quotation:quotations(*), purchase_order_items(id, quantity, item:items(*), quote:quotes(*, variant:item_variants(*)))"
     );
   if (where.id) query = query.eq("id", where.id);
   if (where.token) query = query.eq("token", where.token);
@@ -49,7 +50,7 @@ async function loadPurchaseOrder(
       id: string;
       quantity: number;
       item: Item | Item[];
-      quote: Quote | Quote[];
+      quote: (Quote & { variant?: ItemVariant | ItemVariant[] | null }) | (Quote & { variant?: ItemVariant | ItemVariant[] | null })[];
     }[];
   };
   const row = data as unknown as Row;
@@ -57,12 +58,21 @@ async function loadPurchaseOrder(
   const quotation = Array.isArray(row.quotation)
     ? row.quotation[0]
     : row.quotation;
-  const items: POItemDetail[] = row.purchase_order_items.map((p) => ({
-    id: p.id,
-    quantity: p.quantity,
-    item: Array.isArray(p.item) ? p.item[0] : p.item,
-    quote: Array.isArray(p.quote) ? p.quote[0] : p.quote,
-  }));
+  const items: POItemDetail[] = row.purchase_order_items.map((p) => {
+    const quoteRaw = Array.isArray(p.quote) ? p.quote[0] : p.quote;
+    const variantRaw = quoteRaw?.variant;
+    const variant = Array.isArray(variantRaw)
+      ? variantRaw[0] ?? null
+      : variantRaw ?? null;
+    const { variant: _v, ...quote } = quoteRaw ?? ({} as Quote);
+    return {
+      id: p.id,
+      quantity: p.quantity,
+      item: Array.isArray(p.item) ? p.item[0] : p.item,
+      quote: quote as Quote,
+      variant,
+    };
+  });
 
   const { factory: _f, quotation: _q, purchase_order_items: _pi, ...po } = row;
   return { po: po as PurchaseOrder, factory, quotation, items };

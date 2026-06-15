@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAuthenticated } from "@/lib/auth";
 import type { ItemSpecs } from "@/lib/types";
+import type { VariantDraft } from "@/components/quotations/variants-field";
 
 function parseNumber(v: unknown): number | null {
   if (v === "" || v === null || v === undefined) return null;
@@ -63,6 +64,68 @@ function parsePhotoUrls(formData: FormData): string[] {
     .filter(Boolean);
 }
 
+function parseVariantsJson(formData: FormData): VariantDraft[] {
+  const raw = String(formData.get("variants_json") ?? "").trim();
+  if (!raw) return [{ label: "Standard", description: "" }];
+  try {
+    const parsed = JSON.parse(raw) as VariantDraft[];
+    const cleaned = parsed
+      .map((v) => ({
+        id: v.id,
+        label: String(v.label ?? "").trim(),
+        description: String(v.description ?? "").trim(),
+      }))
+      .filter((v) => v.label.length > 0);
+    return cleaned.length > 0 ? cleaned : [{ label: "Standard", description: "" }];
+  } catch {
+    return [{ label: "Standard", description: "" }];
+  }
+}
+
+async function syncItemVariants(
+  client: ReturnType<typeof createAdminClient>,
+  itemId: string,
+  variants: VariantDraft[]
+) {
+  const { data: existing } = await client
+    .from("item_variants")
+    .select("id")
+    .eq("item_id", itemId);
+
+  const existingIds = new Set((existing ?? []).map((v) => v.id));
+  const keepIds = new Set(
+    variants.map((v) => v.id).filter((id): id is string => !!id)
+  );
+
+  const toDelete = [...existingIds].filter((id) => !keepIds.has(id));
+  if (existing && existing.length - toDelete.length === 0 && variants.length === 0) {
+    return;
+  }
+  if (existing && existing.length - toDelete.length + variants.filter((v) => !v.id).length < 1) {
+    return;
+  }
+
+  for (const id of toDelete) {
+    if ((existing?.length ?? 0) > 1) {
+      await client.from("item_variants").delete().eq("id", id);
+    }
+  }
+
+  for (let i = 0; i < variants.length; i++) {
+    const v = variants[i];
+    const payload = {
+      label: v.label,
+      description: v.description || null,
+      position: i,
+    };
+    if (v.id && existingIds.has(v.id)) {
+      await client.from("item_variants").update(payload).eq("id", v.id);
+    } else {
+      await client.from("item_variants").insert({ item_id: itemId, ...payload });
+    }
+  }
+}
+
 export async function addItem(formData: FormData) {
   const quotation_id = String(formData.get("quotation_id") ?? "");
   if (!quotation_id) return;
@@ -82,7 +145,13 @@ export async function addItem(formData: FormData) {
     specs: hasSpecs ? specs : null,
   };
   const client = createAdminClient();
-  await client.from("items").insert(payload);
+  const { data: created, error } = await client
+    .from("items")
+    .insert(payload)
+    .select("id")
+    .single();
+  if (error || !created) return;
+  await syncItemVariants(client, created.id, parseVariantsJson(formData));
   revalidatePath(`/admin/quotations/${quotation_id}`);
 }
 
@@ -106,6 +175,7 @@ export async function updateItem(formData: FormData) {
   };
   const client = createAdminClient();
   await client.from("items").update(payload).eq("id", id);
+  await syncItemVariants(client, id, parseVariantsJson(formData));
   revalidatePath(`/admin/quotations/${quotation_id}`);
 }
 

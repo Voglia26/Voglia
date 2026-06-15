@@ -91,11 +91,19 @@ export default async function PurchaseOrderDetailPage({
             <div className="flex gap-4">
               <ItemPhotos urls={pi.item.photo_urls} size="md" />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-medium">
-                    {pi.item.name || "(untitled)"}
-                  </h3>
-                  <span className="text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-medium">
+                      {pi.item.name || "(untitled)"}
+                    </h3>
+                    {pi.variant && (
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Variant:{" "}
+                        <span className="text-foreground">{pi.variant.label}</span>
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-sm shrink-0">
                     Qty <span className="font-semibold">{pi.quantity}</span>
                   </span>
                 </div>

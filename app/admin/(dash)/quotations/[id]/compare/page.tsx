@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   Item,
+  ItemVariant,
   Factory,
   QuotationFactory,
   Quote,
@@ -13,6 +14,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { ComparisonTable } from "@/components/quotations/comparison-table";
 import { PageHeader } from "@/components/admin/page-header";
+
+export type CompareRow = {
+  item: Item;
+  variant: ItemVariant;
+};
 
 export default async function ComparePage({
   params,
@@ -38,6 +44,27 @@ export default async function ComparePage({
   const quotation = qRes.data as Quotation | null;
   if (!quotation) notFound();
   const items: Item[] = itemsRes.data ?? [];
+  const itemIds = items.map((i) => i.id);
+
+  const { data: variantsData } =
+    itemIds.length > 0
+      ? await supabase
+          .from("item_variants")
+          .select("*")
+          .in("item_id", itemIds)
+          .order("position", { ascending: true })
+      : { data: [] as ItemVariant[] };
+
+  const variantsByItem = new Map<string, ItemVariant[]>();
+  for (const v of (variantsData ?? []) as ItemVariant[]) {
+    const list = variantsByItem.get(v.item_id) ?? [];
+    list.push(v);
+    variantsByItem.set(v.item_id, list);
+  }
+
+  const compareRows: CompareRow[] = items.flatMap((item) =>
+    (variantsByItem.get(item.id) ?? []).map((variant) => ({ item, variant }))
+  );
 
   type QfShape = QuotationFactory & {
     factory: Factory | Factory[];
@@ -45,22 +72,20 @@ export default async function ComparePage({
   };
   const qfs = ((qfRes.data ?? []) as unknown as QfShape[]).map((qf) => {
     const factory = Array.isArray(qf.factory) ? qf.factory[0] : qf.factory;
-    const assignments = qf.item_assignments.map((a) => ({
-      id: a.id,
-      item_id: a.item_id,
-      quote: Array.isArray(a.quotes) ? a.quotes[0] ?? null : a.quotes,
-    }));
-    return { id: qf.id, factory, accepted_at: qf.accepted_at, assignments };
+    return { id: qf.id, factory, accepted_at: qf.accepted_at, assignments: qf.item_assignments };
   });
 
-  const quotesByItemAndFactory = new Map<string, Map<string, Quote>>();
+  const quotesByVariantAndFactory = new Map<string, Map<string, Quote>>();
   for (const qf of qfs) {
     for (const a of qf.assignments) {
-      if (!a.quote) continue;
-      const inner =
-        quotesByItemAndFactory.get(a.item_id) ?? new Map<string, Quote>();
-      inner.set(qf.factory.id, a.quote);
-      quotesByItemAndFactory.set(a.item_id, inner);
+      const quotes = Array.isArray(a.quotes) ? a.quotes : a.quotes ? [a.quotes] : [];
+      for (const quote of quotes) {
+        const inner =
+          quotesByVariantAndFactory.get(quote.variant_id) ??
+          new Map<string, Quote>();
+        inner.set(qf.factory.id, quote);
+        quotesByVariantAndFactory.set(quote.variant_id, inner);
+      }
     }
   }
 
@@ -79,20 +104,24 @@ export default async function ComparePage({
       <PageHeader
         eyebrow="Comparison"
         title={quotation.title}
-        description="Click a column header to sort. The lowest total per item is highlighted. Pick a winner and quantity, then generate purchase orders."
+        description="Each row is a quote variant. Pick a winner and quantity per variant, then generate purchase orders."
       />
 
       {participatingFactories.length === 0 ? (
         <p className="text-sm text-muted-foreground">No factories assigned.</p>
+      ) : compareRows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No variants defined on items yet.
+        </p>
       ) : (
         <ComparisonTable
           quotationId={id}
           quotationStatus={quotation.status}
-          items={items}
+          rows={compareRows}
           factories={participatingFactories}
-          quotesByItemAndFactory={Object.fromEntries(
-            Array.from(quotesByItemAndFactory.entries()).map(([itemId, m]) => [
-              itemId,
+          quotesByVariantAndFactory={Object.fromEntries(
+            Array.from(quotesByVariantAndFactory.entries()).map(([variantId, m]) => [
+              variantId,
               Object.fromEntries(m),
             ])
           )}

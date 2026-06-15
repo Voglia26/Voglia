@@ -53,6 +53,16 @@ export default async function PublicPOPage({
                       <h3 className="font-semibold text-lg">
                         {pi.item.name || "(untitled)"}
                       </h3>
+                      {pi.variant && (
+                        <p className="text-sm font-medium text-foreground/80 mt-0.5">
+                          Variant: {pi.variant.label}
+                        </p>
+                      )}
+                      {pi.variant?.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {pi.variant.description}
+                        </p>
+                      )}
                       {pi.item.sku && (
                         <p className="text-xs text-muted-foreground">
                           SKU: {pi.item.sku}

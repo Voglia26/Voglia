@@ -3,13 +3,14 @@
 import * as React from "react";
 import { useMemo, useState, useTransition } from "react";
 import { ItemPhotos } from "@/components/items/item-photos";
-import type { Item, Factory, Quote, QuotationStatus } from "@/lib/types";
+import type { Factory, Quote, QuotationStatus } from "@/lib/types";
 import {
   QUOTE_COLUMNS,
   quoteTotal,
   quoteHasValue,
   type QuoteColumnKey,
 } from "@/lib/types";
+import type { CompareRow } from "@/app/admin/(dash)/quotations/[id]/compare/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,15 +29,15 @@ type SortKey = QuoteColumnKey | "total" | null;
 export function ComparisonTable({
   quotationId,
   quotationStatus,
-  items,
+  rows,
   factories,
-  quotesByItemAndFactory,
+  quotesByVariantAndFactory,
 }: {
   quotationId: string;
   quotationStatus: QuotationStatus;
-  items: Item[];
+  rows: CompareRow[];
   factories: Factory[];
-  quotesByItemAndFactory: Record<string, Record<string, Quote>>;
+  quotesByVariantAndFactory: Record<string, Record<string, Quote>>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -44,8 +45,8 @@ export function ComparisonTable({
     Record<string, { factory_id: string; quantity: number }>
   >(() => {
     const initial: Record<string, { factory_id: string; quantity: number }> = {};
-    for (const item of items) {
-      const quotes = quotesByItemAndFactory[item.id];
+    for (const row of rows) {
+      const quotes = quotesByVariantAndFactory[row.variant.id];
       if (!quotes) continue;
       let best: { factoryId: string; total: number } | null = null;
       for (const [fid, q] of Object.entries(quotes)) {
@@ -53,7 +54,9 @@ export function ComparisonTable({
         if (t <= 0) continue;
         if (!best || t < best.total) best = { factoryId: fid, total: t };
       }
-      if (best) initial[item.id] = { factory_id: best.factoryId, quantity: 1 };
+      if (best) {
+        initial[row.variant.id] = { factory_id: best.factoryId, quantity: 1 };
+      }
     }
     return initial;
   });
@@ -62,9 +65,9 @@ export function ComparisonTable({
 
   const sortedFactories = useMemo(() => factories.slice(), [factories]);
 
-  const rows = useMemo(() => {
-    const base = items.map((item) => {
-      const quotes = quotesByItemAndFactory[item.id] ?? {};
+  const tableRows = useMemo(() => {
+    const base = rows.map((row) => {
+      const quotes = quotesByVariantAndFactory[row.variant.id] ?? {};
       const byFactory: Record<
         string,
         { quote: Quote; total: number; declined: boolean } | null
@@ -83,7 +86,7 @@ export function ComparisonTable({
         v && !v.declined && quoteHasValue(v.quote) ? [v.total] : []
       );
       const minTotal = validTotals.length > 0 ? Math.min(...validTotals) : null;
-      return { item, byFactory, minTotal };
+      return { ...row, byFactory, minTotal };
     });
 
     if (!sortKey) return base;
@@ -101,7 +104,7 @@ export function ComparisonTable({
       };
       return (pick(a) - pick(b)) * dir;
     });
-  }, [items, factories, quotesByItemAndFactory, sortKey, sortDir]);
+  }, [rows, factories, quotesByVariantAndFactory, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -114,15 +117,18 @@ export function ComparisonTable({
 
   function handleGenerate() {
     setErr(null);
-    const payload: AwardInput[] = Object.entries(awards)
-      .map(([item_id, v]) => {
-        const quote = quotesByItemAndFactory[item_id]?.[v.factory_id];
+    const payload: AwardInput[] = tableRows
+      .map((row) => {
+        const award = awards[row.variant.id];
+        if (!award) return null;
+        const quote = quotesByVariantAndFactory[row.variant.id]?.[award.factory_id];
         if (!quote) return null;
         return {
-          item_id,
-          factory_id: v.factory_id,
+          variant_id: row.variant.id,
+          item_id: row.item.id,
+          factory_id: award.factory_id,
           quote_id: quote.id,
-          quantity: v.quantity,
+          quantity: award.quantity,
         };
       })
       .filter((x): x is AwardInput => x !== null);
@@ -148,174 +154,206 @@ export function ComparisonTable({
         <div className="overflow-auto">
           <table className="w-full text-sm border-separate border-spacing-0">
             <thead>
-            <tr>
-              <th className="text-left px-4 py-3 eyebrow text-[10px] sticky left-0 bg-muted/60 z-20 min-w-[240px] border-b">
-                Item
-              </th>
-              <SortableHeader
-                label="Best total"
-                active={sortKey === "total"}
-                dir={sortDir}
-                onClick={() => toggleSort("total")}
-                align="right"
-              />
-              {sortedFactories.map((f) => (
-                <th
-                  key={f.id}
-                  className="px-3 py-3 eyebrow text-[10px] text-right min-w-[140px] bg-muted/60 border-b"
-                >
-                  <span className="font-heading text-base normal-case tracking-normal">
-                    {f.name}
-                  </span>
+              <tr>
+                <th className="text-left px-4 py-3 eyebrow text-[10px] sticky left-0 bg-muted/60 z-20 min-w-[260px] border-b">
+                  Item / Variant
                 </th>
-              ))}
-              <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[180px] bg-muted/60 border-b">
-                Award to
-              </th>
-              <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[90px] bg-muted/60 border-b">
-                Qty
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, rowIdx) => {
-              const award = awards[row.item.id];
-              const quotingFactoryIds = sortedFactories
-                .filter((f) => row.byFactory[f.id])
-                .map((f) => f.id);
-
-              const rowBg = rowIdx % 2 === 0 ? "bg-background" : "bg-muted/30";
-              return (
-                <tr key={row.item.id} className={rowBg}>
-                  <td
-                    className={`px-4 py-3 sticky left-0 z-10 border-b ${rowBg}`}
+                <SortableHeader
+                  label="Best total"
+                  active={sortKey === "total"}
+                  dir={sortDir}
+                  onClick={() => toggleSort("total")}
+                  align="right"
+                />
+                {sortedFactories.map((f) => (
+                  <th
+                    key={f.id}
+                    className="px-3 py-3 eyebrow text-[10px] text-right min-w-[140px] bg-muted/60 border-b"
                   >
-                    <div className="flex items-center gap-3">
-                      <ItemPhotos urls={row.item.photo_urls} size="sm" limit={1} />
-                      <div className="min-w-0">
-                        <div className="truncate font-heading text-base">
-                          {row.item.name || "(untitled)"}
+                    <span className="font-heading text-base normal-case tracking-normal">
+                      {f.name}
+                    </span>
+                  </th>
+                ))}
+                <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[180px] bg-muted/60 border-b">
+                  Award to
+                </th>
+                <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[90px] bg-muted/60 border-b">
+                  Qty
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableRows.map((row, rowIdx) => {
+                const award = awards[row.variant.id];
+                const quotingFactoryIds = sortedFactories
+                  .filter((f) => row.byFactory[f.id])
+                  .map((f) => f.id);
+
+                const rowBg = rowIdx % 2 === 0 ? "bg-background" : "bg-muted/30";
+                const prevItemId =
+                  rowIdx > 0 ? tableRows[rowIdx - 1].item.id : null;
+                const showItemHeader = row.item.id !== prevItemId;
+
+                return (
+                  <tr key={row.variant.id} className={rowBg}>
+                    <td
+                      className={`px-4 py-3 sticky left-0 z-10 border-b ${rowBg}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {showItemHeader ? (
+                          <ItemPhotos
+                            urls={row.item.photo_urls}
+                            size="sm"
+                            limit={1}
+                          />
+                        ) : (
+                          <div className="w-10 shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          {showItemHeader && (
+                            <div className="truncate font-heading text-base">
+                              {row.item.name || "(untitled)"}
+                            </div>
+                          )}
+                          <div
+                            className={
+                              showItemHeader
+                                ? "text-sm text-muted-foreground mt-0.5"
+                                : "text-sm font-medium"
+                            }
+                          >
+                            {row.variant.label}
+                          </div>
+                          {row.variant.description ? (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                              {row.variant.description}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right font-heading text-lg tabular-nums border-b">
-                    {row.minTotal !== null ? fmt(row.minTotal) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  {sortedFactories.map((f) => {
-                    const cell = row.byFactory[f.id];
-                    const isMin =
-                      cell !== null &&
-                      cell !== undefined &&
-                      !cell.declined &&
-                      row.minTotal !== null &&
-                      cell.total === row.minTotal;
-                    return (
-                      <td
-                        key={f.id}
-                        className={`px-3 py-3 text-right tabular-nums border-b ${
-                          isMin
-                            ? "bg-green-50 dark:bg-green-950/30 font-semibold text-green-900 dark:text-green-100"
-                            : ""
-                        }`}
-                      >
-                        {!cell ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : cell.declined ? (
-                          <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em]">
-                            Declined
-                          </span>
-                        ) : (
-                          <div title={breakdown(cell.quote)}>
-                            {fmt(cell.total)}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-3 border-b">
-                    {quotingFactoryIds.length > 0 ? (
-                      <Select
-                        value={award?.factory_id ?? ""}
-                        onValueChange={(v) =>
-                          setAwards((prev) => {
-                            const next = { ...prev };
-                            if (!v) delete next[row.item.id];
-                            else
-                              next[row.item.id] = {
-                                factory_id: v,
-                                quantity: prev[row.item.id]?.quantity ?? 1,
-                              };
-                            return next;
-                          })
-                        }
-                      >
-                        <SelectTrigger className="h-9 min-w-[140px]">
-                          <SelectValue placeholder="No winner">
-                            {(v: unknown): React.ReactNode =>
-                              (typeof v === "string" &&
-                                v &&
-                                sortedFactories.find((x) => x.id === v)?.name) ||
-                              "No winner"
-                            }
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {quotingFactoryIds.map((fid) => {
-                            const f = sortedFactories.find((x) => x.id === fid)!;
-                            return (
-                              <SelectItem key={fid} value={fid}>
-                                {f.name}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge variant="outline">No quotes</Badge>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right border-b">
-                    <Input
-                      type="number"
-                      min="1"
-                      className="h-9 w-20 ml-auto text-right tabular-nums"
-                      disabled={!award}
-                      value={award?.quantity ?? ""}
-                      onChange={(e) => {
-                        const q = Math.max(1, Number(e.target.value) || 1);
-                        setAwards((prev) => ({
-                          ...prev,
-                          [row.item.id]: {
-                            factory_id:
-                              prev[row.item.id]?.factory_id ??
-                              quotingFactoryIds[0],
-                            quantity: q,
-                          },
-                        }));
-                      }}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
+                    </td>
+                    <td className="px-3 py-3 text-right font-heading text-lg tabular-nums border-b">
+                      {row.minTotal !== null ? (
+                        fmt(row.minTotal)
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    {sortedFactories.map((f) => {
+                      const cell = row.byFactory[f.id];
+                      const isMin =
+                        cell !== null &&
+                        cell !== undefined &&
+                        !cell.declined &&
+                        row.minTotal !== null &&
+                        cell.total === row.minTotal;
+                      return (
+                        <td
+                          key={f.id}
+                          className={`px-3 py-3 text-right tabular-nums border-b ${
+                            isMin
+                              ? "bg-green-50 dark:bg-green-950/30 font-semibold text-green-900 dark:text-green-100"
+                              : ""
+                          }`}
+                        >
+                          {!cell ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : cell.declined ? (
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em]">
+                              Declined
+                            </span>
+                          ) : (
+                            <div title={breakdown(cell.quote)}>
+                              {fmt(cell.total)}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 py-3 border-b">
+                      {quotingFactoryIds.length > 0 ? (
+                        <Select
+                          value={award?.factory_id ?? ""}
+                          onValueChange={(v) =>
+                            setAwards((prev) => {
+                              const next = { ...prev };
+                              if (!v) delete next[row.variant.id];
+                              else
+                                next[row.variant.id] = {
+                                  factory_id: v,
+                                  quantity: prev[row.variant.id]?.quantity ?? 1,
+                                };
+                              return next;
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-9 min-w-[140px]">
+                            <SelectValue placeholder="No winner">
+                              {(v: unknown): React.ReactNode =>
+                                (typeof v === "string" &&
+                                  v &&
+                                  sortedFactories.find((x) => x.id === v)
+                                    ?.name) ||
+                                "No winner"
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {quotingFactoryIds.map((fid) => {
+                              const f = sortedFactories.find((x) => x.id === fid)!;
+                              return (
+                                <SelectItem key={fid} value={fid}>
+                                  {f.name}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge variant="outline">No quotes</Badge>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right border-b">
+                      <Input
+                        type="number"
+                        min="1"
+                        className="h-9 w-20 ml-auto text-right tabular-nums"
+                        disabled={!award}
+                        value={award?.quantity ?? ""}
+                        onChange={(e) => {
+                          const q = Math.max(1, Number(e.target.value) || 1);
+                          setAwards((prev) => ({
+                            ...prev,
+                            [row.variant.id]: {
+                              factory_id:
+                                prev[row.variant.id]?.factory_id ??
+                                quotingFactoryIds[0],
+                              quantity: q,
+                            },
+                          }));
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
         </div>
       </div>
 
-      {err && (
-        <p className="text-sm text-destructive">{err}</p>
-      )}
+      {err && <p className="text-sm text-destructive">{err}</p>}
 
       {quotationStatus === "closed" ? (
         <p className="text-sm text-muted-foreground">
-          This quotation is already closed and purchase orders have been generated.
+          This quotation is already closed and purchase orders have been
+          generated.
         </p>
       ) : (
         <div className="flex items-center justify-end gap-3 sticky bottom-0 bg-background pt-4 border-t">
           <p className="text-sm text-muted-foreground">
-            {awardsCount} item{awardsCount !== 1 ? "s" : ""} selected
+            {awardsCount} variant{awardsCount !== 1 ? "s" : ""} selected
           </p>
           <Button size="lg" onClick={handleGenerate} disabled={!canGenerate}>
             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Item, Factory, QuotationFactory, ItemAssignment, Quotation, Quote } from "@/lib/types";
+import type { Item, ItemWithVariants, Factory, QuotationFactory, ItemAssignment, Quotation, ItemVariant } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -24,7 +24,7 @@ export default async function QuotationEditorPage({
     supabase.from("quotations").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("items")
-      .select("*")
+      .select("*, item_variants(*)")
       .eq("quotation_id", id)
       .order("created_at", { ascending: true }),
     supabase.from("factories").select("*").order("name", { ascending: true }),
@@ -37,7 +37,11 @@ export default async function QuotationEditorPage({
   const quotation = qRes.data as Quotation | null;
   if (!quotation) notFound();
 
-  const items: Item[] = itemsRes.data ?? [];
+  const items: ItemWithVariants[] = (itemsRes.data ?? []).map((raw) => {
+    const row = raw as Item & { item_variants: ItemVariant[] | null };
+    const variants = (row.item_variants ?? []).slice().sort((a, b) => a.position - b.position);
+    return { ...row, variants };
+  });
   const factories: Factory[] = factoriesRes.data ?? [];
   const qfsRaw = (qfRes.data ?? []) as (QuotationFactory & {
     item_assignments: ItemAssignment[];
@@ -54,23 +58,20 @@ export default async function QuotationEditorPage({
   }
 
   const qfIds = qfsRaw.map((qf) => qf.id);
-  let quotesByQfAndItem = new Map<string, Map<string, Quote>>();
+  let quotesByQf = new Map<string, number>();
   if (qfIds.length > 0) {
     const { data: assignRows } = await supabase
       .from("item_assignments")
-      .select("id, quotation_factory_id, item_id, quotes(*)")
+      .select("id, quotation_factory_id, quotes(id)")
       .in("quotation_factory_id", qfIds);
-    for (const row of (assignRows ?? []) as {
-      quotation_factory_id: string;
-      item_id: string;
-      quotes: Quote | Quote[] | null;
-    }[]) {
-      const quote = Array.isArray(row.quotes) ? row.quotes[0] : row.quotes;
-      if (!quote) continue;
-      const inner =
-        quotesByQfAndItem.get(row.quotation_factory_id) ?? new Map<string, Quote>();
-      inner.set(row.item_id, quote);
-      quotesByQfAndItem.set(row.quotation_factory_id, inner);
+    for (const row of assignRows ?? []) {
+      const quotes = row.quotes;
+      const list = Array.isArray(quotes) ? quotes : quotes ? [quotes] : [];
+      if (list.length === 0) continue;
+      quotesByQf.set(
+        row.quotation_factory_id,
+        (quotesByQf.get(row.quotation_factory_id) ?? 0) + list.length
+      );
     }
   }
 
@@ -205,8 +206,7 @@ export default async function QuotationEditorPage({
                 token: qf.token,
                 accepted_at: qf.accepted_at,
                 assigned_count: qf.item_assignments.length,
-                quotes_count:
-                  quotesByQfAndItem.get(qf.id)?.size ?? 0,
+                quotes_count: quotesByQf.get(qf.id) ?? 0,
               }))}
             />
           </section>

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { syncInventoryFromAwards } from "@/lib/inventory";
 
 export type AwardInput = {
+  variant_id: string;
   item_id: string;
   factory_id: string;
   quote_id: string;

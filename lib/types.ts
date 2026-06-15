@@ -59,6 +59,19 @@ export type Item = {
   created_at: string;
 };
 
+export type ItemVariant = {
+  id: string;
+  item_id: string;
+  label: string;
+  description: string | null;
+  position: number;
+  created_at: string;
+};
+
+export type ItemWithVariants = Item & {
+  variants: ItemVariant[];
+};
+
 export type QuotationFactory = {
   id: string;
   quotation_id: string;
@@ -77,6 +90,7 @@ export type ItemAssignment = {
 export type Quote = {
   id: string;
   item_assignment_id: string;
+  variant_id: string;
   gold_loss: number | null;
   total_gold_cost: number | null;
   diamond_cost: number | null;
