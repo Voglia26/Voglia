@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { QUOTE_COLUMNS, type QuoteColumnKey } from "@/lib/types";
 
@@ -68,6 +67,5 @@ export async function submitFactoryQuotation(
     .eq("id", qf.id);
   if (updErr) return { ok: false, error: updErr.message };
 
-  revalidatePath(`/q/${token}`);
   return { ok: true };
 }

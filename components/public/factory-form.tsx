@@ -83,6 +83,9 @@ export function FactoryForm({
   const [saved, setSaved] = useState(alreadySubmitted);
 
   function setValue(assignmentId: string, col: QuoteColumnKey, v: string) {
+    if (v && declined[assignmentId]) {
+      setDeclined((prev) => ({ ...prev, [assignmentId]: false }));
+    }
     setValues((prev) => ({
       ...prev,
       [assignmentId]: { ...(prev[assignmentId] ?? {}), [col]: v },
@@ -129,7 +132,7 @@ export function FactoryForm({
           </p>
         </div>
       )}
-      <div className="space-y-4 pb-28">
+      <div className="space-y-4 pb-40">
         {items.map((row, idx) => {
           const isDeclined = !!declined[row.assignmentId];
           return (
@@ -139,7 +142,7 @@ export function FactoryForm({
             >
               <Card
                 className={cn(
-                  "p-0 border-0 shadow-none ring-0 bg-transparent",
+                  "overflow-visible p-0 border-0 shadow-none ring-0 bg-transparent",
                   isDeclined && "opacity-60"
                 )}
               >
@@ -220,7 +223,12 @@ export function FactoryForm({
                 className="block w-full min-h-24 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
               />
 
-              <div className="space-y-5 border-t border-border pt-5">
+              <div
+                className={cn(
+                  "relative z-10 space-y-5 border-t border-border pt-5",
+                  isDeclined && "opacity-60"
+                )}
+              >
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-3">
                     Cost breakdown
@@ -240,15 +248,11 @@ export function FactoryForm({
                           type="text"
                           inputMode="decimal"
                           autoComplete="off"
-                          disabled={isDeclined}
                           value={values[row.assignmentId]?.[col.key] ?? ""}
                           onChange={(e) =>
                             setValue(row.assignmentId, col.key, e.target.value)
                           }
-                          className={cn(
-                            "block h-11 w-full rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-                            isDeclined && "opacity-50 cursor-not-allowed"
-                          )}
+                          className="block h-11 w-full rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                         />
                       </div>
                     ))}
@@ -275,7 +279,6 @@ export function FactoryForm({
                   <textarea
                     id={`${row.assignmentId}-notes`}
                     rows={2}
-                    disabled={isDeclined}
                     value={notes[row.assignmentId] ?? ""}
                     onChange={(e) =>
                       setNotes((prev) => ({
@@ -284,10 +287,7 @@ export function FactoryForm({
                       }))
                     }
                     placeholder="Lead time, comments, etc."
-                    className={cn(
-                      "block w-full min-h-16 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-                      isDeclined && "opacity-50 cursor-not-allowed"
-                    )}
+                    className="block w-full min-h-16 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   />
                 </div>
               </div>
@@ -305,7 +305,8 @@ export function FactoryForm({
         </p>
       )}
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sticky bottom-0 -mx-4 sm:mx-0 px-4 sm:px-0 bg-background/95 backdrop-blur-md border-t pt-4 pb-4 sm:pb-2">
+      <div className="pointer-events-none sticky bottom-0 z-20 -mx-4 sm:mx-0 border-t bg-background/95 px-4 pt-4 pb-4 backdrop-blur-md sm:px-0 sm:pb-2">
+        <div className="pointer-events-auto flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
         <p className="text-xs text-muted-foreground max-w-md">
           Fill in all items, then submit once at the bottom. All items are saved
           together.
@@ -314,11 +315,12 @@ export function FactoryForm({
           type="submit"
           size="lg"
           disabled={submitting}
-          className="h-12 eyebrow text-xs tracking-[0.2em] shrink-0"
+          className="h-12 shrink-0 eyebrow text-xs tracking-[0.2em]"
         >
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           {saved ? "Resubmit quotation" : "Submit quotation"}
         </Button>
+        </div>
       </div>
     </form>
   );
