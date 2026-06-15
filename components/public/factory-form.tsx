@@ -1,23 +1,47 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import type { Item } from "@/lib/types";
+import type { Item, Quote } from "@/lib/types";
 import { QUOTE_COLUMNS, KARATAGE_OPTIONS, type QuoteColumnKey, quoteTotal } from "@/lib/types";
 import { ItemPhotos } from "@/components/items/item-photos";
 import { ItemDetails } from "@/components/public/item-details";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { submitFactoryQuotation, type QuoteInput } from "@/app/q/[token]/actions";
 import { Loader2, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Row = { assignmentId: string; item: Item };
+type Row = { assignmentId: string; item: Item; quote?: Quote | null };
 type Values = Partial<Record<QuoteColumnKey, string>>;
+
+function initialFormState(items: Row[]) {
+  const values: Record<string, Values> = {};
+  const notes: Record<string, string> = {};
+  const karatage: Record<string, string> = {};
+  const productDescriptions: Record<string, string> = {};
+  const declined: Record<string, boolean> = {};
+
+  for (const row of items) {
+    const q = row.quote;
+    if (!q) continue;
+
+    const v: Values = {};
+    for (const col of QUOTE_COLUMNS) {
+      const n = q[col.key];
+      if (n !== null && n !== undefined) v[col.key] = String(n);
+    }
+    if (Object.keys(v).length > 0) values[row.assignmentId] = v;
+    if (q.notes) notes[row.assignmentId] = q.notes;
+    if (q.karatage) karatage[row.assignmentId] = q.karatage;
+    if (q.product_description) {
+      productDescriptions[row.assignmentId] = q.product_description;
+    }
+    if (q.declined) declined[row.assignmentId] = true;
+  }
+
+  return { values, notes, karatage, productDescriptions, declined };
+}
 
 function parseValues(raw: Values | undefined) {
   const parsed: Partial<Record<QuoteColumnKey, number | null>> = {};
@@ -33,17 +57,30 @@ function computeDisplayTotal(raw: Values | undefined): number {
   return quoteTotal({ ...parseValues(raw), declined: false, final_price: null });
 }
 
-export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
-  const router = useRouter();
-  const [values, setValues] = useState<Record<string, Values>>({});
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [karatage, setKaratage] = useState<Record<string, string>>({});
+export function FactoryForm({
+  token,
+  items,
+  alreadySubmitted = false,
+}: {
+  token: string;
+  items: Row[];
+  alreadySubmitted?: boolean;
+}) {
+  const initial = initialFormState(items);
+  const [values, setValues] = useState<Record<string, Values>>(initial.values);
+  const [notes, setNotes] = useState<Record<string, string>>(initial.notes);
+  const [karatage, setKaratage] = useState<Record<string, string>>(
+    initial.karatage
+  );
   const [productDescriptions, setProductDescriptions] = useState<
     Record<string, string>
-  >({});
-  const [declined, setDeclined] = useState<Record<string, boolean>>({});
+  >(initial.productDescriptions);
+  const [declined, setDeclined] = useState<Record<string, boolean>>(
+    initial.declined
+  );
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const [saved, setSaved] = useState(alreadySubmitted);
 
   function setValue(assignmentId: string, col: QuoteColumnKey, v: string) {
     setValues((prev) => ({
@@ -68,14 +105,31 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
 
     startTransition(async () => {
       const res = await submitFactoryQuotation(token, inputs);
-      if (res.ok) router.refresh();
-      else setErr(res.error);
+      if (res.ok) {
+        setSaved(true);
+        setErr(null);
+      } else setErr(res.error);
     });
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
+    <form
+      className="space-y-6"
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSubmit();
+      }}
+    >
+      {saved && (
+        <div className="rounded-lg border border-green-600/30 bg-green-600/5 p-4 text-sm">
+          <p className="font-medium">Quotation saved</p>
+          <p className="text-muted-foreground mt-0.5">
+            All items were submitted together. You can keep editing and resubmit
+            when ready.
+          </p>
+        </div>
+      )}
+      <div className="space-y-4 pb-28">
         {items.map((row, idx) => {
           const isDeclined = !!declined[row.assignmentId];
           return (
@@ -166,44 +220,43 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
                 className="block w-full min-h-24 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
               />
 
-              <Card
-                className={cn(
-                  "p-0 border-0 shadow-none ring-0 bg-transparent space-y-5",
-                  isDeclined && "opacity-50 pointer-events-none"
-                )}
-              >
+              <div className="space-y-5 border-t border-border pt-5">
                 <div>
                   <p className="text-sm font-semibold text-foreground mb-3">
                     Cost breakdown
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-                  {QUOTE_COLUMNS.map((col) => (
-                    <div key={col.key} className="space-y-1.5">
-                      <Label
-                        htmlFor={`${row.assignmentId}-${col.key}`}
-                        className="text-xs font-medium text-muted-foreground"
-                      >
-                        {col.label}
-                      </Label>
-                      <Input
-                        id={`${row.assignmentId}-${col.key}`}
-                        type="number"
-                        step="0.01"
-                        inputMode="decimal"
-                        disabled={isDeclined}
-                        className="h-11 text-base tabular-nums"
-                        value={values[row.assignmentId]?.[col.key] ?? ""}
-                        onChange={(e) =>
-                          setValue(row.assignmentId, col.key, e.target.value)
-                        }
-                      />
-                    </div>
-                  ))}
+                    {QUOTE_COLUMNS.map((col) => (
+                      <div key={col.key} className="space-y-1.5">
+                        <label
+                          htmlFor={`${row.assignmentId}-${col.key}`}
+                          className="text-xs font-medium text-muted-foreground"
+                        >
+                          {col.label}
+                        </label>
+                        <input
+                          id={`${row.assignmentId}-${col.key}`}
+                          name={`${row.assignmentId}-${col.key}`}
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          disabled={isDeclined}
+                          value={values[row.assignmentId]?.[col.key] ?? ""}
+                          onChange={(e) =>
+                            setValue(row.assignmentId, col.key, e.target.value)
+                          }
+                          className={cn(
+                            "block h-11 w-full rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                            isDeclined && "opacity-50 cursor-not-allowed"
+                          )}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 <div className="pt-2 border-t">
-                  <Label className="text-sm font-medium mb-1.5 block">Total</Label>
+                  <p className="text-sm font-medium mb-1.5">Total</p>
                   <p className="h-12 flex items-center text-lg tabular-nums font-heading">
                     {computeDisplayTotal(values[row.assignmentId]).toLocaleString(
                       undefined,
@@ -213,13 +266,13 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label
+                  <label
                     htmlFor={`${row.assignmentId}-notes`}
                     className="text-sm font-medium"
                   >
                     Notes (optional)
-                  </Label>
-                  <Textarea
+                  </label>
+                  <textarea
                     id={`${row.assignmentId}-notes`}
                     rows={2}
                     disabled={isDeclined}
@@ -231,9 +284,13 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
                       }))
                     }
                     placeholder="Lead time, comments, etc."
+                    className={cn(
+                      "block w-full min-h-16 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                      isDeclined && "opacity-50 cursor-not-allowed"
+                    )}
                   />
                 </div>
-              </Card>
+              </div>
             </div>
           );
         })}
@@ -250,19 +307,19 @@ export function FactoryForm({ token, items }: { token: string; items: Row[] }) {
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sticky bottom-0 -mx-4 sm:mx-0 px-4 sm:px-0 bg-background/95 backdrop-blur-md border-t pt-4 pb-4 sm:pb-2">
         <p className="text-xs text-muted-foreground max-w-md">
-          Mark items you cannot quote as &quot;Cannot quote&quot; or leave them
-          blank. Submission is final.
+          Fill in all items, then submit once at the bottom. All items are saved
+          together.
         </p>
         <Button
+          type="submit"
           size="lg"
-          onClick={handleSubmit}
           disabled={submitting}
           className="h-12 eyebrow text-xs tracking-[0.2em] shrink-0"
         >
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Submit quotation
+          {saved ? "Resubmit quotation" : "Submit quotation"}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

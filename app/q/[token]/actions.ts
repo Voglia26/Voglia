@@ -27,7 +27,6 @@ export async function submitFactoryQuotation(
     .maybeSingle();
 
   if (!qf) return { ok: false, error: "Link not found" };
-  if (qf.accepted_at) return { ok: false, error: "Already submitted" };
 
   const { data: assignRows } = await supabase
     .from("item_assignments")
@@ -38,29 +37,6 @@ export async function submitFactoryQuotation(
 
   const rows = inputs
     .filter((i) => validIds.has(i.assignmentId))
-    .filter((i) => {
-      if (i.declined) return true;
-      const hasNumber = QUOTE_COLUMNS.some((col) => {
-        const v = i.values[col.key];
-        return v !== null && v !== undefined && !Number.isNaN(v);
-      });
-      const hasFinal =
-        i.final_price !== null &&
-        i.final_price !== undefined &&
-        !Number.isNaN(i.final_price);
-      const hasNotes = !!(i.notes && i.notes.trim());
-      const hasKaratage = !!(i.karatage && i.karatage.trim());
-      const hasProductDescription = !!(
-        i.product_description && i.product_description.trim()
-      );
-      return (
-        hasNumber ||
-        hasFinal ||
-        hasNotes ||
-        hasKaratage ||
-        hasProductDescription
-      );
-    })
     .map((i) => ({
       item_assignment_id: i.assignmentId,
       gold_loss: i.declined ? null : i.values.gold_loss ?? null,
@@ -76,6 +52,7 @@ export async function submitFactoryQuotation(
       product_description: i.declined
         ? null
         : i.product_description?.trim() || null,
+      submitted_at: new Date().toISOString(),
     }));
 
   if (rows.length > 0) {

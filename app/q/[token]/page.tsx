@@ -3,11 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeItem } from "@/lib/items";
 import type { Item, Quote } from "@/lib/types";
 import { FactoryForm } from "@/components/public/factory-form";
-import { ItemDetails } from "@/components/public/item-details";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2 } from "lucide-react";
 import { VogliaLogo } from "@/components/brand/logo";
-import { ItemPhotos } from "@/components/items/item-photos";
 
 type AssignmentRow = {
   id: string;
@@ -65,15 +63,7 @@ export default async function FactoryQuotePage({
     })
     .filter((r): r is { id: string; item: Item; quote: Quote | null } => !!r);
 
-  if (qf.accepted_at) {
-    return (
-      <SubmittedScreen
-        factoryName={factory?.name ?? "Factory"}
-        quotationTitle={quotation?.title ?? ""}
-        rows={rows}
-      />
-    );
-  }
+  const alreadySubmitted = !!qf.accepted_at;
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,10 +82,26 @@ export default async function FactoryQuotePage({
             For{" "}
             <span className="font-medium text-foreground">
               {factory?.name}
-            </span>{" "}
-            · Please quote the items below.
+            </span>
+            {alreadySubmitted
+              ? " · Update your quote below and resubmit."
+              : " · Please quote the items below."}
           </p>
         </header>
+
+        {alreadySubmitted && (
+          <Card className="p-4 mb-6 border-green-600/30 bg-green-600/5">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-sm">Quotation submitted</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  You can edit your prices and resubmit at any time.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {rows.length === 0 ? (
           <Card className="p-8 text-center text-muted-foreground border-dashed">
@@ -108,108 +114,15 @@ export default async function FactoryQuotePage({
         ) : (
           <FactoryForm
             token={token}
-            items={rows.map((r) => ({ assignmentId: r.id, item: r.item }))}
+            alreadySubmitted={alreadySubmitted}
+            items={rows.map((r) => ({
+              assignmentId: r.id,
+              item: r.item,
+              quote: r.quote,
+            }))}
           />
         )}
       </div>
-    </div>
-  );
-}
-
-function SubmittedScreen({
-  factoryName,
-  quotationTitle,
-  rows,
-}: {
-  factoryName: string;
-  quotationTitle: string;
-  rows: { id: string; item: Item; quote: Quote | null }[];
-}) {
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto py-10 px-4">
-        <div className="flex justify-center mb-8">
-          <VogliaLogo width={360} height={90} className="h-20 w-auto" />
-        </div>
-        <Card className="p-6 mb-6 border-green-600/30 bg-green-600/5">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-6 w-6 text-green-600" />
-            <div>
-              <h2 className="font-semibold">Quotation submitted</h2>
-              <p className="text-sm text-muted-foreground">
-                Thanks, {factoryName}. Your response has been recorded for
-                &quot;{quotationTitle}&quot;. This link is now read-only.
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <div className="space-y-3">
-          {rows.map((r) => (
-            <Card key={r.id} className="p-4">
-              <div className="flex gap-4">
-                <ItemPhotos urls={r.item.photo_urls} size="md" zoomable />
-                <div className="flex-1 min-w-0">
-                  <ItemDetails item={r.item} size="md" />
-                  {r.quote ? (
-                    <>
-                      {(r.quote.karatage || r.quote.product_description) && (
-                        <dl className="mt-3 space-y-2 text-sm border-t pt-3">
-                          {r.quote.karatage && (
-                            <div>
-                              <dt className="text-xs text-muted-foreground">
-                                Karatage
-                              </dt>
-                              <dd className="font-medium">{r.quote.karatage}</dd>
-                            </div>
-                          )}
-                          {r.quote.product_description && (
-                            <div>
-                              <dt className="text-xs text-muted-foreground">
-                                Product description
-                              </dt>
-                              <dd className="whitespace-pre-wrap">
-                                {r.quote.product_description}
-                              </dd>
-                            </div>
-                          )}
-                        </dl>
-                      )}
-                      <dl className="mt-3 grid grid-cols-3 gap-2 text-xs border-t pt-3">
-                        <Field label="Gold loss" value={r.quote.gold_loss} />
-                        <Field
-                          label="Total gold cost"
-                          value={r.quote.total_gold_cost}
-                        />
-                        <Field label="Diamond cost" value={r.quote.diamond_cost} />
-                        <Field
-                          label="Cost/carat"
-                          value={r.quote.cost_per_carat}
-                        />
-                        <Field label="Labor" value={r.quote.labor} />
-                        <Field label="Other fees" value={r.quote.other_fees} />
-                      </dl>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Not quoted.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: number | null }) {
-  return (
-    <div>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-medium">{value ?? "—"}</dd>
     </div>
   );
 }
