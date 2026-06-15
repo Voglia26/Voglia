@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { Item, Quote } from "@/lib/types";
-import { QUOTE_COLUMNS, KARATAGE_OPTIONS, type QuoteColumnKey, quoteTotal } from "@/lib/types";
+import {
+  QUOTE_COLUMNS,
+  KARATAGE_OPTIONS,
+  type QuoteColumnKey,
+  quoteTotal,
+} from "@/lib/types";
 import { ItemPhotos } from "@/components/items/item-photos";
 import { ItemDetails } from "@/components/public/item-details";
 import { Card } from "@/components/ui/card";
@@ -57,6 +62,25 @@ function computeDisplayTotal(raw: Values | undefined): number {
   return quoteTotal({ ...parseValues(raw), declined: false, final_price: null });
 }
 
+function readCostValuesFromForm(form: HTMLFormElement): Record<string, Values> {
+  const fd = new FormData(form);
+  const out: Record<string, Values> = {};
+
+  for (const [key, raw] of fd.entries()) {
+    if (typeof raw !== "string") continue;
+    const match = key.match(
+      /^([0-9a-f-]{36})-(gold_loss|total_gold_cost|diamond_cost|cost_per_carat|labor|other_fees)$/
+    );
+    if (!match) continue;
+    const [, assignmentId, colKey] = match;
+    if (!raw.trim()) continue;
+    if (!out[assignmentId]) out[assignmentId] = {};
+    out[assignmentId][colKey as QuoteColumnKey] = raw;
+  }
+
+  return out;
+}
+
 export function FactoryForm({
   token,
   items,
@@ -66,27 +90,37 @@ export function FactoryForm({
   items: Row[];
   alreadySubmitted?: boolean;
 }) {
-  const initial = initialFormState(items);
-  const [values, setValues] = useState<Record<string, Values>>(initial.values);
-  const [notes, setNotes] = useState<Record<string, string>>(initial.notes);
+  const formRef = useRef<HTMLFormElement>(null);
+  const initialRef = useRef(initialFormState(items));
+
+  const [draftValues, setDraftValues] = useState<Record<string, Values>>(
+    () => initialRef.current.values
+  );
+  const [notes, setNotes] = useState<Record<string, string>>(
+    () => initialRef.current.notes
+  );
   const [karatage, setKaratage] = useState<Record<string, string>>(
-    initial.karatage
+    () => initialRef.current.karatage
   );
   const [productDescriptions, setProductDescriptions] = useState<
     Record<string, string>
-  >(initial.productDescriptions);
+  >(() => initialRef.current.productDescriptions);
   const [declined, setDeclined] = useState<Record<string, boolean>>(
-    initial.declined
+    () => initialRef.current.declined
   );
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(alreadySubmitted);
 
-  function setValue(assignmentId: string, col: QuoteColumnKey, v: string) {
+  function handleCostInput(
+    assignmentId: string,
+    col: QuoteColumnKey,
+    v: string
+  ) {
     if (v && declined[assignmentId]) {
       setDeclined((prev) => ({ ...prev, [assignmentId]: false }));
     }
-    setValues((prev) => ({
+    setDraftValues((prev) => ({
       ...prev,
       [assignmentId]: { ...(prev[assignmentId] ?? {}), [col]: v },
     }));
@@ -94,8 +128,12 @@ export function FactoryForm({
 
   function handleSubmit() {
     setErr(null);
+    const formValues = formRef.current
+      ? readCostValuesFromForm(formRef.current)
+      : draftValues;
+
     const inputs: QuoteInput[] = items.map((r) => {
-      const parsed = parseValues(values[r.assignmentId]);
+      const parsed = parseValues(formValues[r.assignmentId]);
       return {
         assignmentId: r.assignmentId,
         values: parsed,
@@ -117,6 +155,7 @@ export function FactoryForm({
 
   return (
     <form
+      ref={formRef}
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
@@ -132,9 +171,10 @@ export function FactoryForm({
           </p>
         </div>
       )}
-      <div className="space-y-4 pb-40">
+      <div className="space-y-4">
         {items.map((row, idx) => {
           const isDeclined = !!declined[row.assignmentId];
+          const displayValues = draftValues[row.assignmentId];
           return (
             <div
               key={row.assignmentId}
@@ -225,7 +265,7 @@ export function FactoryForm({
 
               <div
                 className={cn(
-                  "relative z-10 space-y-5 border-t border-border pt-5",
+                  "space-y-5 border-t border-border pt-5",
                   isDeclined && "opacity-60"
                 )}
               >
@@ -248,11 +288,19 @@ export function FactoryForm({
                           type="text"
                           inputMode="decimal"
                           autoComplete="off"
-                          value={values[row.assignmentId]?.[col.key] ?? ""}
-                          onChange={(e) =>
-                            setValue(row.assignmentId, col.key, e.target.value)
+                          defaultValue={
+                            initialRef.current.values[row.assignmentId]?.[
+                              col.key
+                            ] ?? ""
                           }
-                          className="block h-11 w-full rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                          onInput={(e) =>
+                            handleCostInput(
+                              row.assignmentId,
+                              col.key,
+                              e.currentTarget.value
+                            )
+                          }
+                          className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                         />
                       </div>
                     ))}
@@ -262,9 +310,12 @@ export function FactoryForm({
                 <div className="pt-2 border-t">
                   <p className="text-sm font-medium mb-1.5">Total</p>
                   <p className="h-12 flex items-center text-lg tabular-nums font-heading">
-                    {computeDisplayTotal(values[row.assignmentId]).toLocaleString(
+                    {computeDisplayTotal(displayValues).toLocaleString(
                       undefined,
-                      { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }
                     )}
                   </p>
                 </div>
@@ -305,8 +356,7 @@ export function FactoryForm({
         </p>
       )}
 
-      <div className="pointer-events-none sticky bottom-0 z-20 -mx-4 sm:mx-0 border-t bg-background/95 px-4 pt-4 pb-4 backdrop-blur-md sm:px-0 sm:pb-2">
-        <div className="pointer-events-auto flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-stretch justify-between gap-3 border-t pt-4 sm:flex-row sm:items-center">
         <p className="text-xs text-muted-foreground max-w-md">
           Fill in all items, then submit once at the bottom. All items are saved
           together.
@@ -320,7 +370,6 @@ export function FactoryForm({
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           {saved ? "Resubmit quotation" : "Submit quotation"}
         </Button>
-        </div>
       </div>
     </form>
   );
