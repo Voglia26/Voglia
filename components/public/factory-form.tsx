@@ -3,9 +3,10 @@
 import { useRef, useState, useTransition } from "react";
 import type { Item, ItemVariant, Quote } from "@/lib/types";
 import {
-  QUOTE_COLUMNS,
+  QUOTE_TOTAL_SUM_KEYS,
   KARATAGE_OPTIONS,
-  type QuoteColumnKey,
+  resolveDiamondCost,
+  quoteUsesCaratCalculation,
   quoteTotal,
 } from "@/lib/types";
 import { ItemPhotos } from "@/components/items/item-photos";
@@ -36,7 +37,13 @@ type LocalVariant = {
   description: string;
 };
 
-type Values = Partial<Record<QuoteColumnKey, string>>;
+type CostFieldKey =
+  | (typeof QUOTE_TOTAL_SUM_KEYS)[number]
+  | "diamond_cost"
+  | "cost_per_carat"
+  | "total_carats";
+
+type Values = Partial<Record<CostFieldKey, string>>;
 type FieldKey = string;
 
 function fieldKey(assignmentId: string, variantId: string): FieldKey {
@@ -46,10 +53,30 @@ function fieldKey(assignmentId: string, variantId: string): FieldKey {
 function costFieldName(
   assignmentId: string,
   variantId: string,
-  col: QuoteColumnKey
+  col: CostFieldKey
 ): string {
   return `${assignmentId}__${variantId}__${col}`;
 }
+
+const ALL_COST_FIELDS: CostFieldKey[] = [
+  "gold_loss",
+  "total_gold_cost",
+  "diamond_cost",
+  "cost_per_carat",
+  "total_carats",
+  "labor",
+  "other_fees",
+];
+
+const COST_LABELS: Record<CostFieldKey, string> = {
+  gold_loss: "Gold loss",
+  total_gold_cost: "Total gold cost",
+  diamond_cost: "Diamond cost",
+  cost_per_carat: "Cost per carat",
+  total_carats: "Total carats",
+  labor: "Labor",
+  other_fees: "Other fees",
+};
 
 function initialVariantsByAssignment(rows: FactoryFormRow[]) {
   const out: Record<string, LocalVariant[]> = {};
@@ -91,9 +118,9 @@ function initialFormState(rows: FactoryFormRow[]) {
       if (!q) continue;
 
       const v: Values = {};
-      for (const col of QUOTE_COLUMNS) {
-        const n = q[col.key];
-        if (n !== null && n !== undefined) v[col.key] = String(n);
+      for (const key of ALL_COST_FIELDS) {
+        const n = q[key as keyof typeof q];
+        if (n !== null && n !== undefined) v[key] = String(n);
       }
       if (Object.keys(v).length > 0) values[key] = v;
       if (q.notes) notes[key] = q.notes;
@@ -108,18 +135,45 @@ function initialFormState(rows: FactoryFormRow[]) {
   return { values, notes, karatage, productDescriptions, declined };
 }
 
-function parseValues(raw: Values | undefined) {
-  const parsed: Partial<Record<QuoteColumnKey, number | null>> = {};
-  for (const col of QUOTE_COLUMNS) {
-    const v = raw?.[col.key];
+function parseCostValues(raw: Values | undefined): Partial<Quote> {
+  const num = (key: CostFieldKey) => {
+    const v = raw?.[key];
     const n = v && v.trim() ? Number(v) : null;
-    parsed[col.key] = n !== null && Number.isFinite(n) ? n : null;
-  }
-  return parsed;
+    return n !== null && Number.isFinite(n) ? n : null;
+  };
+  const partial: Partial<Quote> = {
+    gold_loss: num("gold_loss"),
+    total_gold_cost: num("total_gold_cost"),
+    diamond_cost: num("diamond_cost"),
+    cost_per_carat: num("cost_per_carat"),
+    total_carats: num("total_carats"),
+    labor: num("labor"),
+    other_fees: num("other_fees"),
+    declined: false,
+    final_price: null,
+  };
+  return {
+    ...partial,
+    diamond_cost: resolveDiamondCost(partial),
+  };
 }
 
 function computeDisplayTotal(raw: Values | undefined): number {
-  return quoteTotal({ ...parseValues(raw), declined: false, final_price: null });
+  return quoteTotal(parseCostValues(raw));
+}
+
+function syncDiamondCostInValues(values: Values): Values {
+  const per = values.cost_per_carat?.trim();
+  const carats = values.total_carats?.trim();
+  if (!per || !carats) return values;
+  const p = Number(per);
+  const c = Number(carats);
+  if (!Number.isFinite(p) || !Number.isFinite(c)) return values;
+  return { ...values, diamond_cost: String(p * c) };
+}
+
+function isDiamondCalculated(raw: Values | undefined): boolean {
+  return quoteUsesCaratCalculation(parseCostValues(raw));
 }
 
 function readCostValuesFromForm(form: HTMLFormElement): Record<FieldKey, Values> {
@@ -129,14 +183,14 @@ function readCostValuesFromForm(form: HTMLFormElement): Record<FieldKey, Values>
   for (const [key, raw] of fd.entries()) {
     if (typeof raw !== "string") continue;
     const match = key.match(
-      /^([0-9a-f-]{36})__([0-9a-f-]{36})__(gold_loss|total_gold_cost|diamond_cost|cost_per_carat|labor|other_fees)$/
+      /^([0-9a-f-]{36})__([0-9a-f-]{36})__(gold_loss|total_gold_cost|diamond_cost|cost_per_carat|total_carats|labor|other_fees)$/
     );
     if (!match) continue;
     const [, assignmentId, variantId, colKey] = match;
     if (!raw.trim()) continue;
     const fk = fieldKey(assignmentId, variantId);
     if (!out[fk]) out[fk] = {};
-    out[fk][colKey as QuoteColumnKey] = raw;
+    out[fk][colKey as CostFieldKey] = raw;
   }
 
   return out;
@@ -240,34 +294,50 @@ export function FactoryForm({
     }));
   }
 
-  function handleCostInput(fk: FieldKey, col: QuoteColumnKey, v: string) {
+  function handleCostInput(fk: FieldKey, col: CostFieldKey, v: string) {
     if (v && declined[fk]) {
       setDeclined((prev) => ({ ...prev, [fk]: false }));
     }
-    setDraftValues((prev) => ({
-      ...prev,
-      [fk]: { ...(prev[fk] ?? {}), [col]: v },
-    }));
+    setDraftValues((prev) => {
+      const next = { ...(prev[fk] ?? {}), [col]: v };
+      const synced =
+        col === "cost_per_carat" || col === "total_carats"
+          ? syncDiamondCostInValues(next)
+          : next;
+      return { ...prev, [fk]: synced };
+    });
   }
 
   function handleSubmit() {
     setErr(null);
     const formValues = formRef.current
       ? readCostValuesFromForm(formRef.current)
-      : draftValues;
+      : {};
 
     const inputs: VariantQuoteInput[] = [];
     for (const row of rows) {
       const variants = variantsByAssignment[row.assignmentId] ?? [];
       for (const variant of variants) {
         const fk = fieldKey(row.assignmentId, variant.id);
-        const parsed = parseValues(formValues[fk]);
+        const merged: Values = {
+          ...(draftValues[fk] ?? {}),
+          ...(formValues[fk] ?? {}),
+        };
+        const parsed = parseCostValues(merged);
         inputs.push({
           assignmentId: row.assignmentId,
           variantId: variant.id,
           label: variant.label,
           description: variant.description,
-          values: parsed,
+          values: {
+            gold_loss: parsed.gold_loss ?? null,
+            total_gold_cost: parsed.total_gold_cost ?? null,
+            diamond_cost: parsed.diamond_cost ?? null,
+            cost_per_carat: parsed.cost_per_carat ?? null,
+            total_carats: parsed.total_carats ?? null,
+            labor: parsed.labor ?? null,
+            other_fees: parsed.other_fees ?? null,
+          },
           declined: !!declined[fk],
           notes: notes[fk] ?? null,
           karatage: karatage[fk] ?? null,
@@ -354,6 +424,7 @@ export function FactoryForm({
                     const fk = fieldKey(row.assignmentId, variant.id);
                     const isDeclined = !!declined[fk];
                     const displayValues = draftValues[fk];
+                    const diamondCalculated = isDiamondCalculated(displayValues);
 
                     return (
                       <div
@@ -486,31 +557,172 @@ export function FactoryForm({
                             Cost breakdown
                           </p>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-                            {QUOTE_COLUMNS.map((col) => (
-                              <div key={col.key} className="space-y-1.5">
+                            {QUOTE_TOTAL_SUM_KEYS.filter((k) => k !== "labor" && k !== "other_fees").map((col) => (
+                              <div key={col} className="space-y-1.5">
                                 <label
-                                  htmlFor={`${fk}-${col.key}`}
+                                  htmlFor={`${fk}-${col}`}
                                   className="text-xs font-medium text-muted-foreground"
                                 >
-                                  {col.label}
+                                  {COST_LABELS[col]}
                                 </label>
                                 <input
-                                  id={`${fk}-${col.key}`}
+                                  id={`${fk}-${col}`}
                                   name={costFieldName(
                                     row.assignmentId,
                                     variant.id,
-                                    col.key
+                                    col
                                   )}
                                   type="text"
                                   inputMode="decimal"
                                   autoComplete="off"
                                   defaultValue={
-                                    initialRef.current.values[fk]?.[col.key] ?? ""
+                                    initialRef.current.values[fk]?.[col] ?? ""
                                   }
                                   onInput={(e) =>
                                     handleCostInput(
                                       fk,
-                                      col.key,
+                                      col,
+                                      e.currentTarget.value
+                                    )
+                                  }
+                                  className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-4 rounded-lg border border-border bg-background/60 p-4 space-y-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Diamond cost
+                            </p>
+                            <div className="space-y-1.5">
+                              <label
+                                htmlFor={`${fk}-diamond_cost`}
+                                className="text-xs font-medium text-muted-foreground"
+                              >
+                                Diamond cost (total)
+                              </label>
+                              <input
+                                id={`${fk}-diamond_cost`}
+                                name={costFieldName(
+                                  row.assignmentId,
+                                  variant.id,
+                                  "diamond_cost"
+                                )}
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                value={displayValues?.diamond_cost ?? ""}
+                                readOnly={diamondCalculated}
+                                onChange={(e) =>
+                                  handleCostInput(
+                                    fk,
+                                    "diamond_cost",
+                                    e.currentTarget.value
+                                  )
+                                }
+                                className={cn(
+                                  "block h-11 w-full rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                                  diamondCalculated
+                                    ? "cursor-default bg-muted/40"
+                                    : "cursor-text"
+                                )}
+                              />
+                              {diamondCalculated && (
+                                <p className="text-xs text-muted-foreground">
+                                  Calculated from cost per carat × total carats
+                                </p>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground text-center">
+                              — or calculate from —
+                            </p>
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                              <div className="space-y-1.5">
+                                <label
+                                  htmlFor={`${fk}-cost_per_carat`}
+                                  className="text-xs font-medium text-muted-foreground"
+                                >
+                                  Cost per carat
+                                </label>
+                                <input
+                                  id={`${fk}-cost_per_carat`}
+                                  name={costFieldName(
+                                    row.assignmentId,
+                                    variant.id,
+                                    "cost_per_carat"
+                                  )}
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  value={displayValues?.cost_per_carat ?? ""}
+                                  onChange={(e) =>
+                                    handleCostInput(
+                                      fk,
+                                      "cost_per_carat",
+                                      e.currentTarget.value
+                                    )
+                                  }
+                                  className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label
+                                  htmlFor={`${fk}-total_carats`}
+                                  className="text-xs font-medium text-muted-foreground"
+                                >
+                                  Total carats
+                                </label>
+                                <input
+                                  id={`${fk}-total_carats`}
+                                  name={costFieldName(
+                                    row.assignmentId,
+                                    variant.id,
+                                    "total_carats"
+                                  )}
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  value={displayValues?.total_carats ?? ""}
+                                  onChange={(e) =>
+                                    handleCostInput(
+                                      fk,
+                                      "total_carats",
+                                      e.currentTarget.value
+                                    )
+                                  }
+                                  className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-4">
+                            {(["labor", "other_fees"] as const).map((col) => (
+                              <div key={col} className="space-y-1.5">
+                                <label
+                                  htmlFor={`${fk}-${col}`}
+                                  className="text-xs font-medium text-muted-foreground"
+                                >
+                                  {COST_LABELS[col]}
+                                </label>
+                                <input
+                                  id={`${fk}-${col}`}
+                                  name={costFieldName(
+                                    row.assignmentId,
+                                    variant.id,
+                                    col
+                                  )}
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  defaultValue={
+                                    initialRef.current.values[fk]?.[col] ?? ""
+                                  }
+                                  onInput={(e) =>
+                                    handleCostInput(
+                                      fk,
+                                      col,
                                       e.currentTarget.value
                                     )
                                   }

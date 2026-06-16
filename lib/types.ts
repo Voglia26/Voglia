@@ -96,6 +96,7 @@ export type Quote = {
   total_gold_cost: number | null;
   diamond_cost: number | null;
   cost_per_carat: number | null;
+  total_carats: number | null;
   labor: number | null;
   other_fees: number | null;
   final_price: number | null;
@@ -135,11 +136,51 @@ export const QUOTE_COLUMNS = [
   { key: "total_gold_cost", label: "Total gold cost" },
   { key: "diamond_cost", label: "Diamond cost" },
   { key: "cost_per_carat", label: "Cost per carat" },
+  { key: "total_carats", label: "Total carats" },
   { key: "labor", label: "Labor" },
   { key: "other_fees", label: "Other fees" },
 ] as const;
 
 export type QuoteColumnKey = (typeof QUOTE_COLUMNS)[number]["key"];
+
+/** Columns summed into the unit total (diamond cost is resolved separately). */
+export const QUOTE_TOTAL_SUM_KEYS = [
+  "gold_loss",
+  "total_gold_cost",
+  "labor",
+  "other_fees",
+] as const;
+
+export function resolveDiamondCost(q: Partial<Quote>): number {
+  const per = q.cost_per_carat;
+  const carats = q.total_carats;
+  if (
+    per !== null &&
+    per !== undefined &&
+    carats !== null &&
+    carats !== undefined &&
+    Number.isFinite(Number(per)) &&
+    Number.isFinite(Number(carats))
+  ) {
+    return Number(per) * Number(carats);
+  }
+  return Number(q.diamond_cost) || 0;
+}
+
+export function quoteUsesCaratCalculation(q: Partial<Quote>): boolean {
+  const per = q.cost_per_carat;
+  const carats = q.total_carats;
+  return (
+    per !== null &&
+    per !== undefined &&
+    carats !== null &&
+    carats !== undefined &&
+    String(per).trim() !== "" &&
+    String(carats).trim() !== "" &&
+    Number.isFinite(Number(per)) &&
+    Number.isFinite(Number(carats))
+  );
+}
 
 /**
  * Total = final_price if the factory provided one, otherwise the sum
@@ -150,12 +191,17 @@ export function quoteTotal(q: Partial<Quote>): number {
   if (q.final_price !== null && q.final_price !== undefined) {
     return Number(q.final_price) || 0;
   }
-  return QUOTE_COLUMNS.reduce((sum, col) => sum + (Number(q[col.key]) || 0), 0);
+  const parts = QUOTE_TOTAL_SUM_KEYS.reduce(
+    (sum, key) => sum + (Number(q[key]) || 0),
+    0
+  );
+  return parts + resolveDiamondCost(q);
 }
 
 export function quoteHasValue(q: Partial<Quote>): boolean {
   if (q.declined) return false;
   if (q.final_price !== null && q.final_price !== undefined) return true;
+  if (quoteUsesCaratCalculation(q)) return true;
   return QUOTE_COLUMNS.some((col) => {
     const v = q[col.key];
     return v !== null && v !== undefined;

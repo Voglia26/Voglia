@@ -1,20 +1,37 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { QuoteColumnKey } from "@/lib/types";
+import { resolveDiamondCost, quoteUsesCaratCalculation } from "@/lib/types";
+
+export type QuoteValuesInput = {
+  gold_loss: number | null;
+  total_gold_cost: number | null;
+  diamond_cost: number | null;
+  cost_per_carat: number | null;
+  total_carats: number | null;
+  labor: number | null;
+  other_fees: number | null;
+};
 
 export type VariantQuoteInput = {
   assignmentId: string;
   variantId: string;
   label: string;
   description: string;
-  values: Partial<Record<QuoteColumnKey, number | null>>;
+  values: QuoteValuesInput;
   final_price?: number | null;
   declined?: boolean;
   notes?: string | null;
   karatage?: string | null;
   product_description?: string | null;
 };
+
+function normalizeQuoteValues(values: QuoteValuesInput): QuoteValuesInput {
+  const diamond_cost = quoteUsesCaratCalculation(values)
+    ? resolveDiamondCost(values)
+    : values.diamond_cost;
+  return { ...values, diamond_cost };
+}
 
 async function syncAssignmentVariants(
   supabase: ReturnType<typeof createAdminClient>,
@@ -113,24 +130,28 @@ export async function submitFactoryQuotation(
 
   const quoteRows = filtered
     .filter((i) => i.label.trim())
-    .map((i) => ({
-      item_assignment_id: i.assignmentId,
-      variant_id: i.variantId,
-      gold_loss: i.declined ? null : i.values.gold_loss ?? null,
-      total_gold_cost: i.declined ? null : i.values.total_gold_cost ?? null,
-      diamond_cost: i.declined ? null : i.values.diamond_cost ?? null,
-      cost_per_carat: i.declined ? null : i.values.cost_per_carat ?? null,
-      labor: i.declined ? null : i.values.labor ?? null,
-      other_fees: i.declined ? null : i.values.other_fees ?? null,
-      final_price: i.declined ? null : i.final_price ?? null,
-      declined: !!i.declined,
-      notes: i.notes?.trim() || null,
-      karatage: i.declined ? null : i.karatage?.trim() || null,
-      product_description: i.declined
-        ? null
-        : i.product_description?.trim() || null,
-      submitted_at: new Date().toISOString(),
-    }));
+    .map((i) => {
+      const v = i.declined ? null : normalizeQuoteValues(i.values);
+      return {
+        item_assignment_id: i.assignmentId,
+        variant_id: i.variantId,
+        gold_loss: i.declined ? null : v?.gold_loss ?? null,
+        total_gold_cost: i.declined ? null : v?.total_gold_cost ?? null,
+        diamond_cost: i.declined ? null : v?.diamond_cost ?? null,
+        cost_per_carat: i.declined ? null : v?.cost_per_carat ?? null,
+        total_carats: i.declined ? null : v?.total_carats ?? null,
+        labor: i.declined ? null : v?.labor ?? null,
+        other_fees: i.declined ? null : v?.other_fees ?? null,
+        final_price: i.declined ? null : i.final_price ?? null,
+        declined: !!i.declined,
+        notes: i.notes?.trim() || null,
+        karatage: i.declined ? null : i.karatage?.trim() || null,
+        product_description: i.declined
+          ? null
+          : i.product_description?.trim() || null,
+        submitted_at: new Date().toISOString(),
+      };
+    });
 
   if (quoteRows.length > 0) {
     const { error } = await supabase
