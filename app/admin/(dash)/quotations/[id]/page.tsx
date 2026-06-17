@@ -1,14 +1,16 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loadQuotationCompareData, hasAnyQuotes } from "@/lib/quotation-compare";
 import type { Item, ItemWithVariants, Factory, QuotationFactory, ItemAssignment, Quotation, ItemVariant } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Trash2, Send, BarChart3 } from "lucide-react";
+import { ArrowLeft, Trash2, Send } from "lucide-react";
 import { ItemsSection } from "@/components/quotations/items-section";
 import { AssignmentMatrix } from "@/components/quotations/assignment-matrix";
 import { ShareLinks } from "@/components/quotations/share-links";
+import { CompareSheet } from "@/components/quotations/compare-sheet";
 import { sendQuotation, deleteQuotation } from "./actions";
 import { PageHeader } from "@/components/admin/page-header";
 
@@ -20,7 +22,7 @@ export default async function QuotationEditorPage({
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const [qRes, itemsRes, factoriesRes, qfRes] = await Promise.all([
+  const [qRes, itemsRes, factoriesRes, qfRes, compareData] = await Promise.all([
     supabase.from("quotations").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("items")
@@ -32,6 +34,7 @@ export default async function QuotationEditorPage({
       .from("quotation_factories")
       .select("*, item_assignments(*)")
       .eq("quotation_id", id),
+    loadQuotationCompareData(supabase, id),
   ]);
 
   const quotation = qRes.data as Quotation | null;
@@ -111,14 +114,6 @@ export default async function QuotationEditorPage({
         description={description}
         actions={
           <>
-            {quotation.status !== "draft" && (
-              <Link href={`/admin/quotations/${id}/compare`}>
-                <Button>
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Compare
-                </Button>
-              </Link>
-            )}
             {quotation.status === "draft" && totalFactoriesInvolved > 0 && (
               <form action={sendQuotation}>
                 <input type="hidden" name="id" value={id} />
@@ -144,11 +139,25 @@ export default async function QuotationEditorPage({
       />
 
       <section className="mb-12">
-        <div className="flex items-baseline justify-between mb-4">
-          <h2 className="font-heading text-2xl">Items</h2>
-          <p className="text-xs text-muted-foreground">
-            {items.length} total
-          </p>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-baseline gap-3">
+            <h2 className="font-heading text-2xl">Items</h2>
+            <p className="text-xs text-muted-foreground">
+              {items.length} total
+            </p>
+          </div>
+          {compareData && (
+            <CompareSheet
+              quotationId={id}
+              quotationStatus={quotation.status}
+              rows={compareData.rows}
+              factories={compareData.factories.map((f) => ({
+                id: f.id,
+                name: f.name,
+              }))}
+              hasQuotes={hasAnyQuotes(compareData.rows)}
+            />
+          )}
         </div>
         <ItemsSection quotationId={id} items={items} />
       </section>
