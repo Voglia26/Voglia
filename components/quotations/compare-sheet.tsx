@@ -44,8 +44,8 @@ export function CompareSheet({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[90vh] w-[min(96vw,1100px)] max-w-[96vw] flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="shrink-0 border-b px-6 py-4">
+        <DialogContent className="fixed inset-0 top-0 left-0 z-50 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none ring-0 data-open:zoom-in-100 data-closed:zoom-out-100">
+          <DialogHeader className="shrink-0 border-b bg-background px-6 py-4">
             <DialogTitle className="font-heading text-xl">
               Compare quotes
             </DialogTitle>
@@ -55,7 +55,7 @@ export function CompareSheet({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+          <div className="min-h-0 flex-1 overflow-auto bg-background px-6 py-4">
             {!hasQuotes ? (
               <p className="text-sm text-muted-foreground">
                 No quotes yet. Factories must submit their prices first.
