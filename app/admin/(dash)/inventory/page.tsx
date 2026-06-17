@@ -47,13 +47,13 @@ export default async function InventoryPage() {
     <div>
       <PageHeader
         eyebrow="Catálogo"
-        title="Diseños"
-        description="Diseños pedidos a cada proveedor, con fotos, SKU y precios históricos."
+        title="Designs"
+        description="Designs ordered from each supplier, with photos, SKU and price history."
       />
 
       {factories.length === 0 ? (
         <Card className="p-12 text-center text-muted-foreground border-dashed">
-          <p className="font-heading text-xl mb-2">Sin diseños guardados</p>
+          <p className="font-heading text-xl mb-2">No saved designs</p>
           <p className="text-sm max-w-md mx-auto">
             Cuando cierres una cotización y generes órdenes de compra, los
             diseños ganadores se guardarán aquí automáticamente por proveedor.
@@ -74,7 +74,7 @@ export default async function InventoryPage() {
                     </h3>
                     <Badge variant="secondary" className="mt-2">
                       {factory.product_count}{" "}
-                      {factory.product_count === 1 ? "diseño" : "diseños"}
+                      {factory.product_count === 1 ? "design" : "designs"}
                     </Badge>
                   </div>
                 </div>

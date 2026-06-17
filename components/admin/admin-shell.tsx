@@ -21,7 +21,7 @@ const NAV = [
   { href: "/admin/factories", label: "Factories", icon: Factory },
   { href: "/admin/quotations", label: "Quotations", icon: FileText },
   { href: "/admin/purchase-orders", label: "Purchase orders", icon: ClipboardList },
-  { href: "/admin/inventory", label: "Diseños", icon: Archive },
+  { href: "/admin/inventory", label: "Designs", icon: Archive },
 ];
 
 export function AdminShell({

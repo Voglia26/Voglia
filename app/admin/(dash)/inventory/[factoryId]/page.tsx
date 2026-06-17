@@ -54,7 +54,7 @@ export default async function FactoryInventoryPage({
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
-          Diseños
+          Designs
         </Link>
       </div>
 
@@ -62,13 +62,13 @@ export default async function FactoryInventoryPage({
         eyebrow="Proveedor"
         title={typedFactory.name}
         description={`${products.length} ${
-          products.length === 1 ? "diseño pedido" : "diseños pedidos"
-        } a este proveedor.`}
+          products.length === 1 ? "design ordered" : "designs ordered"
+        } from this supplier.`}
       />
 
       {products.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Este proveedor aún no tiene diseños guardados.
+          This supplier has no saved designs yet.
         </p>
       ) : (
         <InventoryProductGrid products={products} />
