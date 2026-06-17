@@ -3,12 +3,11 @@
 import * as React from "react";
 import { useMemo, useState, useTransition } from "react";
 import type { QuotationStatus } from "@/lib/types";
-import type { ItemCompareRow } from "@/lib/quotation-compare";
+import type { ItemCompareRow, QuoteOption } from "@/lib/quotation-compare";
 import { bestValidOption } from "@/lib/quotation-compare";
 import { ItemPhotos } from "@/components/items/item-photos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -17,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   generatePurchaseOrders,
   type AwardInput,
@@ -32,6 +32,15 @@ type ItemAward = {
 
 function fmt(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function validOptions(options: QuoteOption[]): QuoteOption[] {
+  return options.filter((o) => !o.declined && o.total > 0);
+}
+
+function factoryBestPrice(row: ItemCompareRow, factoryId: string): number | null {
+  const best = bestValidOption(row.byFactoryId[factoryId] ?? []);
+  return best?.total ?? null;
 }
 
 function initAwards(rows: ItemCompareRow[], factories: FactoryCol[]): Record<string, ItemAward> {
@@ -60,6 +69,57 @@ function initAwards(rows: ItemCompareRow[], factories: FactoryCol[]): Record<str
   return initial;
 }
 
+function FactoryPriceCell({
+  options,
+  minTotal,
+}: {
+  options: QuoteOption[];
+  minTotal: number | null;
+}) {
+  const quoted = validOptions(options);
+  const allDeclined =
+    options.length > 0 && options.every((o) => o.declined);
+
+  if (quoted.length === 0) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        {allDeclined ? "Rechazado" : "—"}
+      </span>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {quoted.map((o) => {
+        const isMin = minTotal !== null && o.total === minTotal;
+        return (
+          <div
+            key={o.quoteId}
+            className={cn(
+              "rounded-md px-2 py-1.5",
+              isMin && "bg-green-50 dark:bg-green-950/40 ring-1 ring-green-600/20"
+            )}
+          >
+            <div
+              className={cn(
+                "font-heading text-base tabular-nums leading-none",
+                isMin && "text-green-900 dark:text-green-100 font-semibold"
+              )}
+            >
+              {fmt(o.total)}
+            </div>
+            {quoted.length > 1 && (
+              <div className="text-[10px] text-muted-foreground mt-1 leading-tight line-clamp-2">
+                {o.variantLabel}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ItemComparisonMatrix({
   quotationId,
   quotationStatus,
@@ -82,9 +142,9 @@ export function ItemComparisonMatrix({
     for (const row of rows) {
       let min: number | null = null;
       for (const f of factories) {
-        const option = bestValidOption(row.byFactoryId[f.id] ?? []);
-        if (!option) continue;
-        if (min === null || option.total < min) min = option.total;
+        const price = factoryBestPrice(row, f.id);
+        if (price === null) continue;
+        if (min === null || price < min) min = price;
       }
       out[row.item.id] = min;
     }
@@ -92,11 +152,7 @@ export function ItemComparisonMatrix({
   }, [rows, factories]);
 
   function factoriesWithQuotes(row: ItemCompareRow) {
-    return factories.filter((f) =>
-      (row.byFactoryId[f.id] ?? []).some(
-        (o) => !o.declined && o.total > 0
-      )
-    );
+    return factories.filter((f) => validOptions(row.byFactoryId[f.id] ?? []).length > 0);
   }
 
   function handleGenerate() {
@@ -141,30 +197,52 @@ export function ItemComparisonMatrix({
     );
   }
 
+  const stickyProduct =
+    "sticky left-0 z-30 min-w-[220px] w-[220px] max-w-[220px] border-r border-border/80 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)]";
+  const stickyWinner =
+    "sticky right-[72px] z-30 min-w-[200px] w-[200px] border-l border-border/80 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.12)]";
+  const stickyQty =
+    "sticky right-0 z-30 min-w-[72px] w-[72px] border-l border-border/80 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.12)]";
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="overflow-auto">
-          <table className="w-full text-sm border-separate border-spacing-0">
+        <div className="overflow-x-auto">
+          <table className="w-max min-w-full text-sm border-separate border-spacing-0">
             <thead>
               <tr>
-                <th className="text-left px-4 py-3 eyebrow text-[10px] sticky left-0 bg-muted/60 z-20 min-w-[200px] border-b">
+                <th
+                  className={cn(
+                    "text-left px-4 py-3 eyebrow text-[10px] bg-muted/80 backdrop-blur-sm border-b",
+                    stickyProduct
+                  )}
+                >
                   Producto
                 </th>
                 {factories.map((f) => (
                   <th
                     key={f.id}
-                    className="px-3 py-3 eyebrow text-[10px] text-right min-w-[120px] bg-muted/60 border-b"
+                    className="px-3 py-3 eyebrow text-[10px] text-right min-w-[130px] bg-muted/60 border-b"
                   >
                     <span className="font-heading text-sm normal-case tracking-normal">
                       {f.name}
                     </span>
                   </th>
                 ))}
-                <th className="px-3 py-3 eyebrow text-[10px] text-left min-w-[160px] bg-muted/60 border-b">
+                <th
+                  className={cn(
+                    "px-3 py-3 eyebrow text-[10px] text-left bg-muted/80 backdrop-blur-sm border-b",
+                    stickyWinner
+                  )}
+                >
                   Ganador
                 </th>
-                <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[80px] bg-muted/60 border-b">
+                <th
+                  className={cn(
+                    "px-3 py-3 eyebrow text-[10px] text-right bg-muted/80 backdrop-blur-sm border-b",
+                    stickyQty
+                  )}
+                >
                   Cant.
                 </th>
               </tr>
@@ -176,80 +254,59 @@ export function ItemComparisonMatrix({
                 const quotingFactories = factoriesWithQuotes(row);
                 const minTotal = rowMinTotals[row.item.id];
                 const selectedOptions = award
-                  ? (row.byFactoryId[award.factoryId] ?? []).filter(
-                      (o) => !o.declined && o.total > 0
-                    )
+                  ? validOptions(row.byFactoryId[award.factoryId] ?? [])
                   : [];
+                const selectedOption = award
+                  ? selectedOptions.find((o) => o.quoteId === award.quoteId)
+                  : null;
 
                 return (
                   <tr key={row.item.id} className={rowBg}>
                     <td
-                      className={`px-4 py-3 sticky left-0 z-10 border-b ${rowBg}`}
+                      className={cn(
+                        "px-4 py-3 align-top border-b",
+                        stickyProduct,
+                        rowBg
+                      )}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-start gap-3">
                         <ItemPhotos
                           urls={row.item.photo_urls}
                           size="sm"
                           limit={1}
                         />
-                        <div className="min-w-0 truncate font-heading text-base">
-                          {row.item.name || "(sin nombre)"}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-heading text-sm leading-snug wrap-break-word">
+                            {row.item.name || "(sin nombre)"}
+                          </p>
                         </div>
                       </div>
                     </td>
-                    {factories.map((f) => {
-                      const options = row.byFactoryId[f.id] ?? [];
-                      const best = bestValidOption(options);
-                      const allDeclined =
-                        options.length > 0 &&
-                        options.every((o) => o.declined);
-                      const isMin =
-                        best !== null &&
-                        minTotal !== null &&
-                        best.total === minTotal;
-
-                      return (
-                        <td
-                          key={f.id}
-                          className={`px-3 py-3 text-right border-b tabular-nums ${
-                            isMin
-                              ? "bg-green-50 dark:bg-green-950/30 font-semibold text-green-900 dark:text-green-100"
-                              : ""
-                          }`}
-                        >
-                          {!best ? (
-                            allDeclined ? (
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-[0.15em]">
-                                Rechazado
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )
-                          ) : (
-                            <div>
-                              <div className="font-heading text-base">
-                                {fmt(best.total)}
-                              </div>
-                              {options.length > 1 && (
-                                <div className="text-[10px] text-muted-foreground mt-0.5">
-                                  {best.variantLabel}
-                                  {options.filter((o) => !o.declined && o.total > 0).length > 1
-                                    ? ` (+${options.filter((o) => !o.declined && o.total > 0).length - 1})`
-                                    : null}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="px-3 py-3 border-b">
+                    {factories.map((f) => (
+                      <td
+                        key={f.id}
+                        className="px-3 py-3 text-right align-top border-b tabular-nums"
+                      >
+                        <FactoryPriceCell
+                          options={row.byFactoryId[f.id] ?? []}
+                          minTotal={minTotal}
+                        />
+                      </td>
+                    ))}
+                    <td
+                      className={cn(
+                        "px-3 py-3 align-top border-b",
+                        stickyWinner,
+                        rowBg
+                      )}
+                    >
                       {quotingFactories.length > 0 ? (
                         <div className="space-y-2">
                           <Select
                             value={award?.factoryId ?? ""}
                             onValueChange={(factoryId) => {
-                              const options = row.byFactoryId[factoryId as string] ?? [];
+                              const options =
+                                row.byFactoryId[factoryId as string] ?? [];
                               const best = bestValidOption(options);
                               setAwards((prev) => ({
                                 ...prev,
@@ -257,29 +314,26 @@ export function ItemComparisonMatrix({
                                   factoryId: factoryId as string,
                                   quoteId:
                                     best?.quoteId ??
-                                    options.find((o) => !o.declined)?.quoteId ??
+                                    validOptions(options)[0]?.quoteId ??
                                     "",
                                   quantity: prev[row.item.id]?.quantity ?? 1,
                                 },
                               }));
                             }}
                           >
-                            <SelectTrigger className="h-9 min-w-[140px]">
-                              <SelectValue placeholder="Sin ganador">
-                                {(v: unknown): React.ReactNode =>
-                                  (typeof v === "string" &&
-                                    v &&
-                                    factories.find((x) => x.id === v)?.name) ||
-                                  "Sin ganador"
-                                }
-                              </SelectValue>
+                            <SelectTrigger className="h-9 w-full">
+                              <SelectValue placeholder="Elegir fábrica" />
                             </SelectTrigger>
                             <SelectContent>
-                              {quotingFactories.map((f) => (
-                                <SelectItem key={f.id} value={f.id}>
-                                  {f.name}
-                                </SelectItem>
-                              ))}
+                              {quotingFactories.map((f) => {
+                                const price = factoryBestPrice(row, f.id);
+                                return (
+                                  <SelectItem key={f.id} value={f.id}>
+                                    {f.name}
+                                    {price !== null ? ` — ${fmt(price)}` : ""}
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                           {selectedOptions.length > 1 && award && (
@@ -295,18 +349,8 @@ export function ItemComparisonMatrix({
                                 }))
                               }
                             >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Opción">
-                                  {(v: unknown): React.ReactNode => {
-                                    if (typeof v !== "string" || !v) return "Opción";
-                                    const o = selectedOptions.find(
-                                      (x) => x.quoteId === v
-                                    );
-                                    return o
-                                      ? `${o.variantLabel} (${fmt(o.total)})`
-                                      : "Opción";
-                                  }}
-                                </SelectValue>
+                              <SelectTrigger className="h-8 w-full text-xs">
+                                <SelectValue placeholder="Opción" />
                               </SelectTrigger>
                               <SelectContent>
                                 {selectedOptions.map((o) => (
@@ -317,16 +361,29 @@ export function ItemComparisonMatrix({
                               </SelectContent>
                             </Select>
                           )}
+                          {selectedOption ? (
+                            <p className="text-sm font-heading tabular-nums text-foreground">
+                              {fmt(selectedOption.total)}
+                            </p>
+                          ) : null}
                         </div>
                       ) : (
-                        <Badge variant="outline">Sin cotizaciones</Badge>
+                        <p className="text-xs text-muted-foreground leading-snug">
+                          Sin cotizaciones
+                        </p>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-right border-b">
+                    <td
+                      className={cn(
+                        "px-3 py-3 text-right align-top border-b",
+                        stickyQty,
+                        rowBg
+                      )}
+                    >
                       <Input
                         type="number"
                         min="1"
-                        className="h-9 w-16 ml-auto text-right tabular-nums"
+                        className="h-9 w-14 ml-auto text-right tabular-nums"
                         disabled={!award}
                         value={award?.quantity ?? ""}
                         onChange={(e) => {

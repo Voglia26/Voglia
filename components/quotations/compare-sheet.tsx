@@ -46,7 +46,7 @@ export function CompareSheet({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-[min(96vw,1200px)] overflow-y-auto"
+          className="w-full sm:max-w-[min(96vw,1200px)] overflow-y-auto p-6"
         >
           <SheetHeader className="pb-4 border-b mb-4">
             <SheetTitle className="font-heading text-2xl">Comparar cotizaciones</SheetTitle>
