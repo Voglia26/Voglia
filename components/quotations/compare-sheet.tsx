@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import type { QuotationStatus } from "@/lib/types";
 import type { ItemCompareRow } from "@/lib/quotation-compare";
 import { ItemComparisonMatrix } from "@/components/quotations/item-comparison-matrix";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, XIcon } from "lucide-react";
 
 type FactoryCol = { id: string; name: string };
+
+const FULLSCREEN_STYLE: CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  width: "100vw",
+  height: "100vh",
+};
 
 export function CompareSheet({
   quotationId,
@@ -30,6 +32,30 @@ export function CompareSheet({
   hasQuotes: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  const close = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, close]);
 
   return (
     <>
@@ -43,34 +69,56 @@ export function CompareSheet({
         Compare
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="fixed inset-0 top-0 left-0 z-50 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none ring-0 data-open:zoom-in-100 data-closed:zoom-out-100">
-          <DialogHeader className="shrink-0 border-b bg-background px-6 py-4">
-            <DialogTitle className="font-heading text-xl">
-              Compare quotes
-            </DialogTitle>
-            <DialogDescription>
-              Factory prices side by side. Pick a winner and quantity per
-              product.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="min-h-0 flex-1 overflow-auto bg-background px-6 py-4">
-            {!hasQuotes ? (
-              <p className="text-sm text-muted-foreground">
-                No quotes yet. Factories must submit their prices first.
+      {mounted &&
+        open &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="compare-title"
+            className="z-[100] flex flex-col bg-background"
+            style={FULLSCREEN_STYLE}
+          >
+            <header className="relative shrink-0 border-b px-6 py-4 pr-14">
+              <h2
+                id="compare-title"
+                className="font-heading text-xl font-medium leading-none"
+              >
+                Compare quotes
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Factory prices side by side. Pick a winner and quantity per
+                product.
               </p>
-            ) : (
-              <ItemComparisonMatrix
-                quotationId={quotationId}
-                quotationStatus={quotationStatus}
-                rows={rows}
-                factories={factories}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute top-3 right-3"
+                onClick={close}
+                aria-label="Close"
+              >
+                <XIcon className="h-4 w-4" />
+              </Button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+              {!hasQuotes ? (
+                <p className="text-sm text-muted-foreground">
+                  No quotes yet. Factories must submit their prices first.
+                </p>
+              ) : (
+                <ItemComparisonMatrix
+                  quotationId={quotationId}
+                  quotationStatus={quotationStatus}
+                  rows={rows}
+                  factories={factories}
+                />
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }
