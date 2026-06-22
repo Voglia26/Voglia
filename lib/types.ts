@@ -88,6 +88,12 @@ export type ItemAssignment = {
   item_id: string;
 };
 
+export type QuoteStoneLine = {
+  label: string;
+  cost_per_carat: number;
+  total_carats: number;
+};
+
 export type Quote = {
   id: string;
   item_assignment_id: string;
@@ -97,6 +103,7 @@ export type Quote = {
   diamond_cost: number | null;
   cost_per_carat: number | null;
   total_carats: number | null;
+  stone_lines?: QuoteStoneLine[] | null;
   labor: number | null;
   other_fees: number | null;
   final_price: number | null;
@@ -151,7 +158,42 @@ export const QUOTE_TOTAL_SUM_KEYS = [
   "other_fees",
 ] as const;
 
+export function normalizeStoneLines(raw: unknown): QuoteStoneLine[] {
+  if (!Array.isArray(raw)) return [];
+  const out: QuoteStoneLine[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Record<string, unknown>;
+    const label = String(e.label ?? "").trim();
+    const per = Number(e.cost_per_carat);
+    const carats = Number(e.total_carats);
+    if (!label || !Number.isFinite(per) || !Number.isFinite(carats)) continue;
+    out.push({ label, cost_per_carat: per, total_carats: carats });
+  }
+  return out;
+}
+
+export function stoneLineCost(line: Partial<QuoteStoneLine>): number {
+  const per = line.cost_per_carat;
+  const carats = line.total_carats;
+  if (
+    per !== null &&
+    per !== undefined &&
+    carats !== null &&
+    carats !== undefined &&
+    Number.isFinite(Number(per)) &&
+    Number.isFinite(Number(carats))
+  ) {
+    return Number(per) * Number(carats);
+  }
+  return 0;
+}
+
 export function resolveDiamondCost(q: Partial<Quote>): number {
+  const lines = normalizeStoneLines(q.stone_lines);
+  if (lines.length > 0) {
+    return lines.reduce((sum, line) => sum + stoneLineCost(line), 0);
+  }
   const per = q.cost_per_carat;
   const carats = q.total_carats;
   if (
@@ -168,6 +210,8 @@ export function resolveDiamondCost(q: Partial<Quote>): number {
 }
 
 export function quoteUsesCaratCalculation(q: Partial<Quote>): boolean {
+  const lines = normalizeStoneLines(q.stone_lines);
+  if (lines.length > 0) return true;
   const per = q.cost_per_carat;
   const carats = q.total_carats;
   return (

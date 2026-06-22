@@ -1,12 +1,12 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import type { Item, ItemVariant, Quote } from "@/lib/types";
+import type { Item, ItemVariant, Quote, QuoteStoneLine } from "@/lib/types";
 import {
   QUOTE_TOTAL_SUM_KEYS,
   KARATAGE_OPTIONS,
+  normalizeStoneLines,
   resolveDiamondCost,
-  quoteUsesCaratCalculation,
   quoteTotal,
 } from "@/lib/types";
 import { ItemPhotos } from "@/components/items/item-photos";
@@ -37,11 +37,14 @@ type LocalVariant = {
   description: string;
 };
 
-type CostFieldKey =
-  | (typeof QUOTE_TOTAL_SUM_KEYS)[number]
-  | "diamond_cost"
-  | "cost_per_carat"
-  | "total_carats";
+type LocalStoneLine = {
+  id: string;
+  label: string;
+  cost_per_carat: string;
+  total_carats: string;
+};
+
+type CostFieldKey = (typeof QUOTE_TOTAL_SUM_KEYS)[number] | "diamond_cost";
 
 type Values = Partial<Record<CostFieldKey, string>>;
 type FieldKey = string;
@@ -62,8 +65,6 @@ const ALL_COST_FIELDS: CostFieldKey[] = [
   "gold_loss",
   "total_gold_cost",
   "diamond_cost",
-  "cost_per_carat",
-  "total_carats",
   "labor",
   "other_fees",
 ];
@@ -72,11 +73,77 @@ const COST_LABELS: Record<CostFieldKey, string> = {
   gold_loss: "Gold loss",
   total_gold_cost: "Total gold cost",
   diamond_cost: "Diamond cost",
-  cost_per_carat: "Cost per carat",
-  total_carats: "Total carats",
   labor: "Labor",
   other_fees: "Other fees",
 };
+
+function emptyStoneLine(): LocalStoneLine {
+  return {
+    id: crypto.randomUUID(),
+    label: "",
+    cost_per_carat: "",
+    total_carats: "",
+  };
+}
+
+function initialStoneLinesFromQuote(q: Quote | null | undefined): LocalStoneLine[] {
+  if (!q) return [emptyStoneLine()];
+  const fromDb = normalizeStoneLines(q.stone_lines);
+  if (fromDb.length > 0) {
+    return fromDb.map((line) => ({
+      id: crypto.randomUUID(),
+      label: line.label,
+      cost_per_carat: String(line.cost_per_carat),
+      total_carats: String(line.total_carats),
+    }));
+  }
+  if (
+    q.cost_per_carat !== null &&
+    q.cost_per_carat !== undefined &&
+    q.total_carats !== null &&
+    q.total_carats !== undefined
+  ) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        label: "Stones",
+        cost_per_carat: String(q.cost_per_carat),
+        total_carats: String(q.total_carats),
+      },
+    ];
+  }
+  return [emptyStoneLine()];
+}
+
+function initialStoneLinesByAssignment(rows: FactoryFormRow[]) {
+  const variantsByAssignment = initialVariantsByAssignment(rows);
+  const out: Record<FieldKey, LocalStoneLine[]> = {};
+  for (const row of rows) {
+    const variants = variantsByAssignment[row.assignmentId] ?? [];
+    for (const variant of variants) {
+      const key = fieldKey(row.assignmentId, variant.id);
+      out[key] = initialStoneLinesFromQuote(
+        row.quotesByVariantId[variant.id] ?? null
+      );
+    }
+  }
+  return out;
+}
+
+function parseStoneLines(stones: LocalStoneLine[]): QuoteStoneLine[] {
+  const out: QuoteStoneLine[] = [];
+  for (const line of stones) {
+    const label = line.label.trim();
+    const per = line.cost_per_carat.trim();
+    const carats = line.total_carats.trim();
+    if (!label || !per || !carats) continue;
+    const p = Number(per);
+    const c = Number(carats);
+    if (!Number.isFinite(p) || !Number.isFinite(c)) continue;
+    out.push({ label, cost_per_carat: p, total_carats: c });
+  }
+  return out;
+}
 
 function initialVariantsByAssignment(rows: FactoryFormRow[]) {
   const out: Record<string, LocalVariant[]> = {};
@@ -135,18 +202,23 @@ function initialFormState(rows: FactoryFormRow[]) {
   return { values, notes, karatage, productDescriptions, declined };
 }
 
-function parseCostValues(raw: Values | undefined): Partial<Quote> {
+function parseCostValues(
+  raw: Values | undefined,
+  stones: LocalStoneLine[]
+): Partial<Quote> {
   const num = (key: CostFieldKey) => {
     const v = raw?.[key];
     const n = v && v.trim() ? Number(v) : null;
     return n !== null && Number.isFinite(n) ? n : null;
   };
+  const stone_lines = parseStoneLines(stones);
   const partial: Partial<Quote> = {
     gold_loss: num("gold_loss"),
     total_gold_cost: num("total_gold_cost"),
     diamond_cost: num("diamond_cost"),
-    cost_per_carat: num("cost_per_carat"),
-    total_carats: num("total_carats"),
+    cost_per_carat: null,
+    total_carats: null,
+    stone_lines,
     labor: num("labor"),
     other_fees: num("other_fees"),
     declined: false,
@@ -158,22 +230,20 @@ function parseCostValues(raw: Values | undefined): Partial<Quote> {
   };
 }
 
-function computeDisplayTotal(raw: Values | undefined): number {
-  return quoteTotal(parseCostValues(raw));
+function computeDisplayTotal(
+  raw: Values | undefined,
+  stones: LocalStoneLine[]
+): number {
+  return quoteTotal(parseCostValues(raw, stones));
 }
 
-function syncDiamondCostInValues(values: Values): Values {
-  const per = values.cost_per_carat?.trim();
-  const carats = values.total_carats?.trim();
-  if (!per || !carats) return values;
-  const p = Number(per);
-  const c = Number(carats);
-  if (!Number.isFinite(p) || !Number.isFinite(c)) return values;
-  return { ...values, diamond_cost: String(p * c) };
-}
-
-function isDiamondCalculated(raw: Values | undefined): boolean {
-  return quoteUsesCaratCalculation(parseCostValues(raw));
+function formatDiamondTotal(
+  raw: Values | undefined,
+  stones: LocalStoneLine[]
+): string {
+  const total = resolveDiamondCost(parseCostValues(raw, stones));
+  if (total <= 0) return "";
+  return String(total);
 }
 
 function readCostValuesFromForm(form: HTMLFormElement): Record<FieldKey, Values> {
@@ -183,7 +253,7 @@ function readCostValuesFromForm(form: HTMLFormElement): Record<FieldKey, Values>
   for (const [key, raw] of fd.entries()) {
     if (typeof raw !== "string") continue;
     const match = key.match(
-      /^([0-9a-f-]{36})__([0-9a-f-]{36})__(gold_loss|total_gold_cost|diamond_cost|cost_per_carat|total_carats|labor|other_fees)$/
+      /^([0-9a-f-]{36})__([0-9a-f-]{36})__(gold_loss|total_gold_cost|diamond_cost|labor|other_fees)$/
     );
     if (!match) continue;
     const [, assignmentId, variantId, colKey] = match;
@@ -211,6 +281,9 @@ export function FactoryForm({
   const [variantsByAssignment, setVariantsByAssignment] = useState<
     Record<string, LocalVariant[]>
   >(() => initialVariantsByAssignment(rows));
+  const [stoneLinesByField, setStoneLinesByField] = useState<
+    Record<FieldKey, LocalStoneLine[]>
+  >(() => initialStoneLinesByAssignment(rows));
   const [draftValues, setDraftValues] = useState<Record<FieldKey, Values>>(
     () => initialRef.current.values
   );
@@ -231,6 +304,7 @@ export function FactoryForm({
   const [saved, setSaved] = useState(alreadySubmitted);
 
   function addVariant(assignmentId: string) {
+    const newId = crypto.randomUUID();
     setVariantsByAssignment((prev) => {
       const list = prev[assignmentId] ?? [];
       const n = list.length + 1;
@@ -239,13 +313,17 @@ export function FactoryForm({
         [assignmentId]: [
           ...list,
           {
-            id: crypto.randomUUID(),
+            id: newId,
             label: `Option ${n}`,
             description: "",
           },
         ],
       };
     });
+    setStoneLinesByField((prev) => ({
+      ...prev,
+      [fieldKey(assignmentId, newId)]: [emptyStoneLine()],
+    }));
   }
 
   function removeVariant(assignmentId: string, variantId: string) {
@@ -279,6 +357,47 @@ export function FactoryForm({
       delete next[fk];
       return next;
     });
+    setStoneLinesByField((prev) => {
+      const next = { ...prev };
+      delete next[fk];
+      return next;
+    });
+  }
+
+  function addStoneLine(fk: FieldKey) {
+    setStoneLinesByField((prev) => ({
+      ...prev,
+      [fk]: [...(prev[fk] ?? [emptyStoneLine()]), emptyStoneLine()],
+    }));
+  }
+
+  function removeStoneLine(fk: FieldKey, stoneId: string) {
+    setStoneLinesByField((prev) => {
+      const list = prev[fk] ?? [emptyStoneLine()];
+      const next = list.filter((s) => s.id !== stoneId);
+      return {
+        ...prev,
+        [fk]: next.length > 0 ? next : [emptyStoneLine()],
+      };
+    });
+  }
+
+  function updateStoneLine(
+    fk: FieldKey,
+    stoneId: string,
+    patch: Partial<Omit<LocalStoneLine, "id">>
+  ) {
+    if (patch.cost_per_carat !== undefined || patch.total_carats !== undefined) {
+      if (declined[fk]) {
+        setDeclined((prev) => ({ ...prev, [fk]: false }));
+      }
+    }
+    setStoneLinesByField((prev) => ({
+      ...prev,
+      [fk]: (prev[fk] ?? [emptyStoneLine()]).map((s) =>
+        s.id === stoneId ? { ...s, ...patch } : s
+      ),
+    }));
   }
 
   function updateVariantMeta(
@@ -298,14 +417,10 @@ export function FactoryForm({
     if (v && declined[fk]) {
       setDeclined((prev) => ({ ...prev, [fk]: false }));
     }
-    setDraftValues((prev) => {
-      const next = { ...(prev[fk] ?? {}), [col]: v };
-      const synced =
-        col === "cost_per_carat" || col === "total_carats"
-          ? syncDiamondCostInValues(next)
-          : next;
-      return { ...prev, [fk]: synced };
-    });
+    setDraftValues((prev) => ({
+      ...prev,
+      [fk]: { ...(prev[fk] ?? {}), [col]: v },
+    }));
   }
 
   function handleSubmit() {
@@ -323,7 +438,7 @@ export function FactoryForm({
           ...(draftValues[fk] ?? {}),
           ...(formValues[fk] ?? {}),
         };
-        const parsed = parseCostValues(merged);
+        const parsed = parseCostValues(merged, stoneLinesByField[fk] ?? []);
         inputs.push({
           assignmentId: row.assignmentId,
           variantId: variant.id,
@@ -333,8 +448,9 @@ export function FactoryForm({
             gold_loss: parsed.gold_loss ?? null,
             total_gold_cost: parsed.total_gold_cost ?? null,
             diamond_cost: parsed.diamond_cost ?? null,
-            cost_per_carat: parsed.cost_per_carat ?? null,
-            total_carats: parsed.total_carats ?? null,
+            cost_per_carat: null,
+            total_carats: null,
+            stone_lines: parsed.stone_lines ?? [],
             labor: parsed.labor ?? null,
             other_fees: parsed.other_fees ?? null,
           },
@@ -424,7 +540,8 @@ export function FactoryForm({
                     const fk = fieldKey(row.assignmentId, variant.id);
                     const isDeclined = !!declined[fk];
                     const displayValues = draftValues[fk];
-                    const diamondCalculated = isDiamondCalculated(displayValues);
+                    const stones = stoneLinesByField[fk] ?? [emptyStoneLine()];
+                    const diamondTotal = formatDiamondTotal(displayValues, stones);
 
                     return (
                       <div
@@ -591,110 +708,163 @@ export function FactoryForm({
                             ))}
                           </div>
 
-                          <div className="mt-4 rounded-lg border border-border bg-background/60 p-4 space-y-3">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                              Diamond cost
-                            </p>
-                            <div className="space-y-1.5">
-                              <label
-                                htmlFor={`${fk}-diamond_cost`}
-                                className="text-xs font-medium text-muted-foreground"
-                              >
-                                Diamond cost (total)
-                              </label>
-                              <input
-                                id={`${fk}-diamond_cost`}
-                                name={costFieldName(
-                                  row.assignmentId,
-                                  variant.id,
-                                  "diamond_cost"
-                                )}
-                                type="text"
-                                inputMode="decimal"
-                                autoComplete="off"
-                                value={displayValues?.diamond_cost ?? ""}
-                                readOnly={diamondCalculated}
-                                onChange={(e) =>
-                                  handleCostInput(
-                                    fk,
-                                    "diamond_cost",
-                                    e.currentTarget.value
-                                  )
-                                }
-                                className={cn(
-                                  "block h-11 w-full rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-                                  diamondCalculated
-                                    ? "cursor-default bg-muted/40"
-                                    : "cursor-text"
-                                )}
-                              />
-                              {diamondCalculated && (
-                                <p className="text-xs text-muted-foreground">
-                                  Calculated from cost per carat × total carats
+                          <div className="mt-4 rounded-lg border border-border bg-background/60 p-4 space-y-4">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                  Stone types
                                 </p>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground text-center">
-                              — or calculate from —
-                            </p>
-                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                              <div className="space-y-1.5">
-                                <label
-                                  htmlFor={`${fk}-cost_per_carat`}
-                                  className="text-xs font-medium text-muted-foreground"
-                                >
-                                  Cost per carat
-                                </label>
-                                <input
-                                  id={`${fk}-cost_per_carat`}
-                                  name={costFieldName(
-                                    row.assignmentId,
-                                    variant.id,
-                                    "cost_per_carat"
-                                  )}
-                                  type="text"
-                                  inputMode="decimal"
-                                  autoComplete="off"
-                                  value={displayValues?.cost_per_carat ?? ""}
-                                  onChange={(e) =>
-                                    handleCostInput(
-                                      fk,
-                                      "cost_per_carat",
-                                      e.currentTarget.value
-                                    )
-                                  }
-                                  className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Add each stone type with cost per carat and total
+                                  carats. Totals are summed automatically.
+                                </p>
                               </div>
-                              <div className="space-y-1.5">
-                                <label
-                                  htmlFor={`${fk}-total_carats`}
-                                  className="text-xs font-medium text-muted-foreground"
-                                >
-                                  Total carats
-                                </label>
-                                <input
-                                  id={`${fk}-total_carats`}
-                                  name={costFieldName(
-                                    row.assignmentId,
-                                    variant.id,
-                                    "total_carats"
-                                  )}
-                                  type="text"
-                                  inputMode="decimal"
-                                  autoComplete="off"
-                                  value={displayValues?.total_carats ?? ""}
-                                  onChange={(e) =>
-                                    handleCostInput(
-                                      fk,
-                                      "total_carats",
-                                      e.currentTarget.value
-                                    )
-                                  }
-                                  className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                                />
+                              <div className="space-y-1 shrink-0">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  Diamond cost (total)
+                                </p>
+                                <p className="h-11 flex items-center px-3 rounded-lg border border-input bg-muted/40 text-base tabular-nums font-medium">
+                                  {diamondTotal
+                                    ? Number(diamondTotal).toLocaleString(
+                                        undefined,
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : "—"}
+                                </p>
                               </div>
                             </div>
+
+                            <div className="space-y-3">
+                              {stones.map((stone, stoneIdx) => {
+                                const lineTotal = (() => {
+                                  const p = Number(stone.cost_per_carat);
+                                  const c = Number(stone.total_carats);
+                                  if (!Number.isFinite(p) || !Number.isFinite(c))
+                                    return null;
+                                  return p * c;
+                                })();
+
+                                return (
+                                  <div
+                                    key={stone.id}
+                                    className="rounded-lg border border-border/80 bg-background p-3 space-y-3"
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-medium text-muted-foreground">
+                                        Stone {stoneIdx + 1}
+                                      </p>
+                                      {stones.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon-sm"
+                                          aria-label="Remove stone type"
+                                          onClick={() =>
+                                            removeStoneLine(fk, stone.id)
+                                          }
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                      <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                                        <label
+                                          htmlFor={`${fk}-stone-${stone.id}-label`}
+                                          className="text-xs font-medium text-muted-foreground"
+                                        >
+                                          Stone type
+                                        </label>
+                                        <input
+                                          id={`${fk}-stone-${stone.id}-label`}
+                                          type="text"
+                                          autoComplete="off"
+                                          value={stone.label}
+                                          onChange={(e) =>
+                                            updateStoneLine(fk, stone.id, {
+                                              label: e.target.value,
+                                            })
+                                          }
+                                          placeholder="e.g. Round diamonds"
+                                          className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label
+                                          htmlFor={`${fk}-stone-${stone.id}-per`}
+                                          className="text-xs font-medium text-muted-foreground"
+                                        >
+                                          Cost per carat
+                                        </label>
+                                        <input
+                                          id={`${fk}-stone-${stone.id}-per`}
+                                          type="text"
+                                          inputMode="decimal"
+                                          autoComplete="off"
+                                          value={stone.cost_per_carat}
+                                          onChange={(e) =>
+                                            updateStoneLine(fk, stone.id, {
+                                              cost_per_carat: e.target.value,
+                                            })
+                                          }
+                                          className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label
+                                          htmlFor={`${fk}-stone-${stone.id}-carats`}
+                                          className="text-xs font-medium text-muted-foreground"
+                                        >
+                                          Total carats
+                                        </label>
+                                        <input
+                                          id={`${fk}-stone-${stone.id}-carats`}
+                                          type="text"
+                                          inputMode="decimal"
+                                          autoComplete="off"
+                                          value={stone.total_carats}
+                                          onChange={(e) =>
+                                            updateStoneLine(fk, stone.id, {
+                                              total_carats: e.target.value,
+                                            })
+                                          }
+                                          className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                          Line total
+                                        </p>
+                                        <p className="h-11 flex items-center px-3 rounded-lg border border-dashed border-border bg-muted/20 text-sm tabular-nums">
+                                          {lineTotal !== null
+                                            ? lineTotal.toLocaleString(
+                                                undefined,
+                                                {
+                                                  minimumFractionDigits: 2,
+                                                  maximumFractionDigits: 2,
+                                                }
+                                              )
+                                            : "—"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addStoneLine(fk)}
+                            >
+                              <Plus className="h-4 w-4 mr-1.5" />
+                              Add stone type
+                            </Button>
                           </div>
 
                           <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-4">
@@ -736,7 +906,10 @@ export function FactoryForm({
                         <div className="pt-2 border-t">
                           <p className="text-sm font-medium mb-1.5">Total</p>
                           <p className="h-12 flex items-center text-lg tabular-nums font-heading">
-                            {computeDisplayTotal(displayValues).toLocaleString(
+                            {computeDisplayTotal(
+                              displayValues,
+                              stones
+                            ).toLocaleString(
                               undefined,
                               {
                                 minimumFractionDigits: 2,
