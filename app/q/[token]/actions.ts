@@ -4,12 +4,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   normalizeStoneLines,
   resolveDiamondCost,
+  resolveGoldLoss,
   quoteUsesCaratCalculation,
+  quoteUsesGoldLossPercent,
   type QuoteStoneLine,
 } from "@/lib/types";
 
 export type QuoteValuesInput = {
   gold_loss: number | null;
+  gold_loss_percent: number | null;
   total_gold_cost: number | null;
   diamond_cost: number | null;
   cost_per_carat: number | null;
@@ -35,15 +38,21 @@ export type VariantQuoteInput = {
 function normalizeQuoteValues(values: QuoteValuesInput): QuoteValuesInput {
   const stone_lines = normalizeStoneLines(values.stone_lines);
   const usesStones = stone_lines.length > 0;
+  const usesGoldPercent = quoteUsesGoldLossPercent(values);
   const quoteLike = { ...values, stone_lines };
   const diamond_cost =
     usesStones || quoteUsesCaratCalculation(quoteLike)
       ? resolveDiamondCost(quoteLike)
       : values.diamond_cost;
+  const gold_loss = usesGoldPercent
+    ? resolveGoldLoss({ ...values, stone_lines })
+    : values.gold_loss;
   return {
     ...values,
     stone_lines,
     diamond_cost,
+    gold_loss,
+    gold_loss_percent: usesGoldPercent ? values.gold_loss_percent : null,
     cost_per_carat: usesStones ? null : values.cost_per_carat,
     total_carats: usesStones ? null : values.total_carats,
   };
@@ -152,6 +161,7 @@ export async function submitFactoryQuotation(
         item_assignment_id: i.assignmentId,
         variant_id: i.variantId,
         gold_loss: i.declined ? null : v?.gold_loss ?? null,
+        gold_loss_percent: i.declined ? null : v?.gold_loss_percent ?? null,
         total_gold_cost: i.declined ? null : v?.total_gold_cost ?? null,
         diamond_cost: i.declined ? null : v?.diamond_cost ?? null,
         cost_per_carat: i.declined ? null : v?.cost_per_carat ?? null,

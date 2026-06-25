@@ -99,6 +99,7 @@ export type Quote = {
   item_assignment_id: string;
   variant_id: string;
   gold_loss: number | null;
+  gold_loss_percent: number | null;
   total_gold_cost: number | null;
   diamond_cost: number | null;
   cost_per_carat: number | null;
@@ -150,13 +151,38 @@ export const QUOTE_COLUMNS = [
 
 export type QuoteColumnKey = (typeof QUOTE_COLUMNS)[number]["key"];
 
-/** Columns summed into the unit total (diamond cost is resolved separately). */
+/** Columns summed into the unit total (gold loss and diamond cost resolved separately). */
 export const QUOTE_TOTAL_SUM_KEYS = [
-  "gold_loss",
   "total_gold_cost",
   "labor",
   "other_fees",
 ] as const;
+
+export function quoteUsesGoldLossPercent(q: Partial<Quote>): boolean {
+  const percent = q.gold_loss_percent;
+  return (
+    percent !== null &&
+    percent !== undefined &&
+    String(percent).trim() !== "" &&
+    Number.isFinite(Number(percent))
+  );
+}
+
+export function resolveGoldLoss(q: Partial<Quote>): number {
+  const percent = q.gold_loss_percent;
+  const goldCost = q.total_gold_cost;
+  if (
+    percent !== null &&
+    percent !== undefined &&
+    goldCost !== null &&
+    goldCost !== undefined &&
+    Number.isFinite(Number(percent)) &&
+    Number.isFinite(Number(goldCost))
+  ) {
+    return Number(goldCost) * (Number(percent) / 100);
+  }
+  return Number(q.gold_loss) || 0;
+}
 
 export function normalizeStoneLines(raw: unknown): QuoteStoneLine[] {
   if (!Array.isArray(raw)) return [];
@@ -239,12 +265,13 @@ export function quoteTotal(q: Partial<Quote>): number {
     (sum, key) => sum + (Number(q[key]) || 0),
     0
   );
-  return parts + resolveDiamondCost(q);
+  return parts + resolveGoldLoss(q) + resolveDiamondCost(q);
 }
 
 export function quoteHasValue(q: Partial<Quote>): boolean {
   if (q.declined) return false;
   if (q.final_price !== null && q.final_price !== undefined) return true;
+  if (quoteUsesGoldLossPercent(q)) return true;
   if (quoteUsesCaratCalculation(q)) return true;
   return QUOTE_COLUMNS.some((col) => {
     const v = q[col.key];

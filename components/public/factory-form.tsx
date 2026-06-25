@@ -7,6 +7,7 @@ import {
   KARATAGE_OPTIONS,
   normalizeStoneLines,
   resolveDiamondCost,
+  resolveGoldLoss,
   quoteTotal,
 } from "@/lib/types";
 import { ItemPhotos } from "@/components/items/item-photos";
@@ -44,6 +45,14 @@ type LocalStoneLine = {
   total_carats: string;
 };
 
+type GoldLossMode = "fixed" | "percent";
+
+type GoldLossState = {
+  mode: GoldLossMode;
+  fixed: string;
+  percent: string;
+};
+
 type CostFieldKey = (typeof QUOTE_TOTAL_SUM_KEYS)[number] | "diamond_cost";
 
 type Values = Partial<Record<CostFieldKey, string>>;
@@ -62,7 +71,6 @@ function costFieldName(
 }
 
 const ALL_COST_FIELDS: CostFieldKey[] = [
-  "gold_loss",
   "total_gold_cost",
   "diamond_cost",
   "labor",
@@ -70,12 +78,78 @@ const ALL_COST_FIELDS: CostFieldKey[] = [
 ];
 
 const COST_LABELS: Record<CostFieldKey, string> = {
-  gold_loss: "Gold loss",
   total_gold_cost: "Total gold cost",
   diamond_cost: "Diamond cost",
   labor: "Labor",
   other_fees: "Other fees",
 };
+
+function emptyGoldLossState(): GoldLossState {
+  return { mode: "fixed", fixed: "", percent: "" };
+}
+
+function initialGoldLossFromQuote(q: Quote | null | undefined): GoldLossState {
+  if (!q) return emptyGoldLossState();
+  if (
+    q.gold_loss_percent !== null &&
+    q.gold_loss_percent !== undefined &&
+    Number.isFinite(Number(q.gold_loss_percent))
+  ) {
+    return {
+      mode: "percent",
+      fixed: "",
+      percent: String(q.gold_loss_percent),
+    };
+  }
+  return {
+    mode: "fixed",
+    fixed:
+      q.gold_loss !== null && q.gold_loss !== undefined
+        ? String(q.gold_loss)
+        : "",
+    percent: "",
+  };
+}
+
+function initialGoldLossByAssignment(rows: FactoryFormRow[]) {
+  const variantsByAssignment = initialVariantsByAssignment(rows);
+  const out: Record<FieldKey, GoldLossState> = {};
+  for (const row of rows) {
+    const variants = variantsByAssignment[row.assignmentId] ?? [];
+    for (const variant of variants) {
+      const key = fieldKey(row.assignmentId, variant.id);
+      out[key] = initialGoldLossFromQuote(
+        row.quotesByVariantId[variant.id] ?? null
+      );
+    }
+  }
+  return out;
+}
+
+function parseGoldLossState(
+  goldLoss: GoldLossState,
+  totalGoldCost: number | null
+): Pick<Quote, "gold_loss" | "gold_loss_percent"> {
+  if (goldLoss.mode === "percent") {
+    const percentRaw = goldLoss.percent.trim();
+    const percent = percentRaw ? Number(percentRaw) : null;
+    if (percent === null || !Number.isFinite(percent)) {
+      return { gold_loss: null, gold_loss_percent: null };
+    }
+    const gold_loss =
+      totalGoldCost !== null && Number.isFinite(totalGoldCost)
+        ? totalGoldCost * (percent / 100)
+        : null;
+    return { gold_loss, gold_loss_percent: percent };
+  }
+  const fixedRaw = goldLoss.fixed.trim();
+  const gold_loss = fixedRaw ? Number(fixedRaw) : null;
+  return {
+    gold_loss:
+      gold_loss !== null && Number.isFinite(gold_loss) ? gold_loss : null,
+    gold_loss_percent: null,
+  };
+}
 
 function emptyStoneLine(): LocalStoneLine {
   return {
@@ -204,7 +278,8 @@ function initialFormState(rows: FactoryFormRow[]) {
 
 function parseCostValues(
   raw: Values | undefined,
-  stones: LocalStoneLine[]
+  stones: LocalStoneLine[],
+  goldLoss: GoldLossState
 ): Partial<Quote> {
   const num = (key: CostFieldKey) => {
     const v = raw?.[key];
@@ -212,9 +287,15 @@ function parseCostValues(
     return n !== null && Number.isFinite(n) ? n : null;
   };
   const stone_lines = parseStoneLines(stones);
+  const total_gold_cost = num("total_gold_cost");
+  const { gold_loss, gold_loss_percent } = parseGoldLossState(
+    goldLoss,
+    total_gold_cost
+  );
   const partial: Partial<Quote> = {
-    gold_loss: num("gold_loss"),
-    total_gold_cost: num("total_gold_cost"),
+    gold_loss,
+    gold_loss_percent,
+    total_gold_cost,
     diamond_cost: num("diamond_cost"),
     cost_per_carat: null,
     total_carats: null,
@@ -227,23 +308,49 @@ function parseCostValues(
   return {
     ...partial,
     diamond_cost: resolveDiamondCost(partial),
+    gold_loss:
+      goldLoss.mode === "percent"
+        ? resolveGoldLoss(partial)
+        : partial.gold_loss,
   };
 }
 
 function computeDisplayTotal(
   raw: Values | undefined,
-  stones: LocalStoneLine[]
+  stones: LocalStoneLine[],
+  goldLoss: GoldLossState
 ): number {
-  return quoteTotal(parseCostValues(raw, stones));
+  return quoteTotal(parseCostValues(raw, stones, goldLoss));
 }
 
 function formatDiamondTotal(
   raw: Values | undefined,
-  stones: LocalStoneLine[]
+  stones: LocalStoneLine[],
+  goldLoss: GoldLossState
 ): string {
-  const total = resolveDiamondCost(parseCostValues(raw, stones));
+  const total = resolveDiamondCost(parseCostValues(raw, stones, goldLoss));
   if (total <= 0) return "";
   return String(total);
+}
+
+function formatGoldLossAmount(
+  raw: Values | undefined,
+  goldLoss: GoldLossState
+): string {
+  const num = (key: CostFieldKey) => {
+    const v = raw?.[key];
+    const n = v && v.trim() ? Number(v) : null;
+    return n !== null && Number.isFinite(n) ? n : null;
+  };
+  const total = resolveGoldLoss({
+    ...parseGoldLossState(goldLoss, num("total_gold_cost")),
+    total_gold_cost: num("total_gold_cost"),
+  });
+  if (total <= 0) return "";
+  return total.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function readCostValuesFromForm(form: HTMLFormElement): Record<FieldKey, Values> {
@@ -253,7 +360,7 @@ function readCostValuesFromForm(form: HTMLFormElement): Record<FieldKey, Values>
   for (const [key, raw] of fd.entries()) {
     if (typeof raw !== "string") continue;
     const match = key.match(
-      /^([0-9a-f-]{36})__([0-9a-f-]{36})__(gold_loss|total_gold_cost|diamond_cost|labor|other_fees)$/
+      /^([0-9a-f-]{36})__([0-9a-f-]{36})__(total_gold_cost|diamond_cost|labor|other_fees)$/
     );
     if (!match) continue;
     const [, assignmentId, variantId, colKey] = match;
@@ -284,6 +391,9 @@ export function FactoryForm({
   const [stoneLinesByField, setStoneLinesByField] = useState<
     Record<FieldKey, LocalStoneLine[]>
   >(() => initialStoneLinesByAssignment(rows));
+  const [goldLossByField, setGoldLossByField] = useState<
+    Record<FieldKey, GoldLossState>
+  >(() => initialGoldLossByAssignment(rows));
   const [draftValues, setDraftValues] = useState<Record<FieldKey, Values>>(
     () => initialRef.current.values
   );
@@ -324,6 +434,10 @@ export function FactoryForm({
       ...prev,
       [fieldKey(assignmentId, newId)]: [emptyStoneLine()],
     }));
+    setGoldLossByField((prev) => ({
+      ...prev,
+      [fieldKey(assignmentId, newId)]: emptyGoldLossState(),
+    }));
   }
 
   function removeVariant(assignmentId: string, variantId: string) {
@@ -361,6 +475,28 @@ export function FactoryForm({
       const next = { ...prev };
       delete next[fk];
       return next;
+    });
+    setGoldLossByField((prev) => {
+      const next = { ...prev };
+      delete next[fk];
+      return next;
+    });
+  }
+
+  function updateGoldLoss(
+    fk: FieldKey,
+    patch: Partial<GoldLossState> | ((prev: GoldLossState) => GoldLossState)
+  ) {
+    if (declined[fk]) {
+      setDeclined((prev) => ({ ...prev, [fk]: false }));
+    }
+    setGoldLossByField((prev) => {
+      const current = prev[fk] ?? emptyGoldLossState();
+      const next =
+        typeof patch === "function"
+          ? patch(current)
+          : { ...current, ...patch };
+      return { ...prev, [fk]: next };
     });
   }
 
@@ -438,7 +574,11 @@ export function FactoryForm({
           ...(draftValues[fk] ?? {}),
           ...(formValues[fk] ?? {}),
         };
-        const parsed = parseCostValues(merged, stoneLinesByField[fk] ?? []);
+        const parsed = parseCostValues(
+          merged,
+          stoneLinesByField[fk] ?? [],
+          goldLossByField[fk] ?? emptyGoldLossState()
+        );
         inputs.push({
           assignmentId: row.assignmentId,
           variantId: variant.id,
@@ -446,6 +586,7 @@ export function FactoryForm({
           description: variant.description,
           values: {
             gold_loss: parsed.gold_loss ?? null,
+            gold_loss_percent: parsed.gold_loss_percent ?? null,
             total_gold_cost: parsed.total_gold_cost ?? null,
             diamond_cost: parsed.diamond_cost ?? null,
             cost_per_carat: null,
@@ -541,7 +682,16 @@ export function FactoryForm({
                     const isDeclined = !!declined[fk];
                     const displayValues = draftValues[fk];
                     const stones = stoneLinesByField[fk] ?? [emptyStoneLine()];
-                    const diamondTotal = formatDiamondTotal(displayValues, stones);
+                    const goldLoss = goldLossByField[fk] ?? emptyGoldLossState();
+                    const diamondTotal = formatDiamondTotal(
+                      displayValues,
+                      stones,
+                      goldLoss
+                    );
+                    const goldLossAmount = formatGoldLossAmount(
+                      displayValues,
+                      goldLoss
+                    );
 
                     return (
                       <div
@@ -673,39 +823,144 @@ export function FactoryForm({
                           <p className="text-sm font-semibold text-foreground mb-3">
                             Cost breakdown
                           </p>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-                            {QUOTE_TOTAL_SUM_KEYS.filter((k) => k !== "labor" && k !== "other_fees").map((col) => (
-                              <div key={col} className="space-y-1.5">
-                                <label
-                                  htmlFor={`${fk}-${col}`}
-                                  className="text-xs font-medium text-muted-foreground"
-                                >
-                                  {COST_LABELS[col]}
-                                </label>
-                                <input
-                                  id={`${fk}-${col}`}
-                                  name={costFieldName(
-                                    row.assignmentId,
-                                    variant.id,
-                                    col
-                                  )}
-                                  type="text"
-                                  inputMode="decimal"
-                                  autoComplete="off"
-                                  defaultValue={
-                                    initialRef.current.values[fk]?.[col] ?? ""
-                                  }
-                                  onInput={(e) =>
-                                    handleCostInput(
-                                      fk,
-                                      col,
-                                      e.currentTarget.value
-                                    )
-                                  }
-                                  className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                                />
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                            <div className="space-y-1.5">
+                              <label
+                                htmlFor={`${fk}-total_gold_cost`}
+                                className="text-xs font-medium text-muted-foreground"
+                              >
+                                {COST_LABELS.total_gold_cost}
+                              </label>
+                              <input
+                                id={`${fk}-total_gold_cost`}
+                                name={costFieldName(
+                                  row.assignmentId,
+                                  variant.id,
+                                  "total_gold_cost"
+                                )}
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                defaultValue={
+                                  initialRef.current.values[fk]
+                                    ?.total_gold_cost ?? ""
+                                }
+                                onInput={(e) =>
+                                  handleCostInput(
+                                    fk,
+                                    "total_gold_cost",
+                                    e.currentTarget.value
+                                  )
+                                }
+                                className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-4 rounded-lg border border-border bg-background/60 p-4 space-y-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                              <div className="space-y-2">
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                  Gold loss
+                                </p>
+                                <div className="inline-flex rounded-lg border border-input p-0.5 bg-muted/30">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateGoldLoss(fk, { mode: "fixed" })
+                                    }
+                                    className={cn(
+                                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                                      goldLoss.mode === "fixed"
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                  >
+                                    Fixed amount
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateGoldLoss(fk, { mode: "percent" })
+                                    }
+                                    className={cn(
+                                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                                      goldLoss.mode === "percent"
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                  >
+                                    Percentage
+                                  </button>
+                                </div>
                               </div>
-                            ))}
+                              {goldLoss.mode === "percent" && (
+                                <div className="space-y-1 shrink-0">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    Gold loss (calculated)
+                                  </p>
+                                  <p className="h-11 flex items-center px-3 rounded-lg border border-input bg-muted/40 text-base tabular-nums font-medium min-w-[8rem]">
+                                    {goldLossAmount || "—"}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-md">
+                              {goldLoss.mode === "fixed" ? (
+                                <div className="space-y-1.5">
+                                  <label
+                                    htmlFor={`${fk}-gold_loss_fixed`}
+                                    className="text-xs font-medium text-muted-foreground"
+                                  >
+                                    Gold loss amount
+                                  </label>
+                                  <input
+                                    id={`${fk}-gold_loss_fixed`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoComplete="off"
+                                    value={goldLoss.fixed}
+                                    onChange={(e) =>
+                                      updateGoldLoss(fk, {
+                                        fixed: e.target.value,
+                                      })
+                                    }
+                                    className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  <label
+                                    htmlFor={`${fk}-gold_loss_percent`}
+                                    className="text-xs font-medium text-muted-foreground"
+                                  >
+                                    Gold loss (%)
+                                  </label>
+                                  <div className="relative">
+                                    <input
+                                      id={`${fk}-gold_loss_percent`}
+                                      type="text"
+                                      inputMode="decimal"
+                                      autoComplete="off"
+                                      value={goldLoss.percent}
+                                      onChange={(e) =>
+                                        updateGoldLoss(fk, {
+                                          percent: e.target.value,
+                                        })
+                                      }
+                                      className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 pr-8 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                                    />
+                                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                                      %
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Calculated from total gold cost × percentage
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="mt-4 rounded-lg border border-border bg-background/60 p-4 space-y-4">
@@ -908,7 +1163,8 @@ export function FactoryForm({
                           <p className="h-12 flex items-center text-lg tabular-nums font-heading">
                             {computeDisplayTotal(
                               displayValues,
-                              stones
+                              stones,
+                              goldLoss
                             ).toLocaleString(
                               undefined,
                               {
