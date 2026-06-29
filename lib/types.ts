@@ -25,6 +25,28 @@ export const PURCHASE_ORDER_STATUS_LABELS: Record<
   received: "Received",
 };
 
+export type ShipmentStatus =
+  | "ordered"
+  | "in_transit"
+  | "in_customs"
+  | "received";
+
+export type ShipmentSource = "purchase_order" | "manual" | "import";
+
+export const SHIPMENT_STATUS_FLOW: ShipmentStatus[] = [
+  "ordered",
+  "in_transit",
+  "in_customs",
+  "received",
+];
+
+export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
+  ordered: "Ordered",
+  in_transit: "In Transit",
+  in_customs: "In Customs",
+  received: "Received",
+};
+
 export type ItemSpecs = {
   weight_g?: number | null;
   carats?: number | null;
@@ -137,6 +159,33 @@ export type PurchaseOrderItem = {
   item_id: string;
   quote_id: string;
   quantity: number;
+};
+
+export type Shipment = {
+  id: string;
+  purchase_order_id: string | null;
+  factory_id: string;
+  status: ShipmentStatus;
+  order_date: string;
+  expected_arrival_date: string | null;
+  received_at: string | null;
+  archived_at: string | null;
+  source: ShipmentSource;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type ShipmentItem = {
+  id: string;
+  shipment_id: string;
+  purchase_order_item_id: string | null;
+  name: string | null;
+  sku: string | null;
+  photo_url: string | null;
+  quantity: number;
+  position: number;
 };
 
 export const QUOTE_COLUMNS = [

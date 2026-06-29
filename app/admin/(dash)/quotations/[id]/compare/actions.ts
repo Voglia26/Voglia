@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncInventoryFromAwards } from "@/lib/inventory";
+import { createShipmentFromPurchaseOrder } from "@/lib/shipments";
 
 export type AwardInput = {
   variant_id: string;
@@ -51,7 +52,7 @@ export async function generatePurchaseOrders(
     const { data: po, error: poErr } = await supabase
       .from("purchase_orders")
       .insert({ quotation_id, factory_id })
-      .select("id")
+      .select("id, created_at")
       .single();
     if (poErr || !po) return { ok: false, error: poErr?.message ?? "PO insert failed" };
 
@@ -65,6 +66,14 @@ export async function generatePurchaseOrders(
       .from("purchase_order_items")
       .insert(rows);
     if (itemsErr) return { ok: false, error: itemsErr.message };
+
+    const shipRes = await createShipmentFromPurchaseOrder(
+      supabase,
+      po.id,
+      factory_id,
+      po.created_at
+    );
+    if (!shipRes.ok) return shipRes;
 
     for (const a of list) {
       inventoryAwards.push({
@@ -89,5 +98,6 @@ export async function generatePurchaseOrders(
   revalidatePath(`/admin/quotations/${quotation_id}`);
   revalidatePath("/admin/purchase-orders");
   revalidatePath("/admin/inventory");
+  revalidatePath("/admin/shipments");
   redirect("/admin/purchase-orders");
 }

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { LayoutDashboard, Factory, FileText, ClipboardList, LogOut, Menu, Archive } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, ClipboardList, LogOut, Menu, Archive, Truck } from "lucide-react";
 import { VogliaLogo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,7 @@ const NAV = [
   { href: "/admin/factories", label: "Factories", icon: Factory },
   { href: "/admin/quotations", label: "Quotations", icon: FileText },
   { href: "/admin/purchase-orders", label: "Purchase orders", icon: ClipboardList },
+  { href: "/admin/shipments", label: "Shipments", icon: Truck },
   { href: "/admin/inventory", label: "Designs", icon: Archive },
 ];
 
