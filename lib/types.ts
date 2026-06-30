@@ -235,31 +235,68 @@ export function resolveGoldLoss(q: Partial<Quote>): number {
   return Number(q.gold_loss) || 0;
 }
 
-export function quoteGoldGrams(q: Partial<Quote>): {
+export function quoteGoldGrams(
+  q: Partial<Quote>,
+  refWeightG?: number | null
+): {
   weightG: number | null;
   lossG: number | null;
 } {
-  const weightG =
+  let weightG =
     q.gold_weight_g !== null &&
     q.gold_weight_g !== undefined &&
     Number.isFinite(Number(q.gold_weight_g))
       ? Number(q.gold_weight_g)
       : null;
-  const lossG =
+  let lossG =
     q.gold_loss_g !== null &&
     q.gold_loss_g !== undefined &&
     Number.isFinite(Number(q.gold_loss_g))
       ? Number(q.gold_loss_g)
       : null;
+
+  // Legacy: loss in grams stored in gold_loss before gold_loss_g column
+  if (lossG === null && !quoteUsesGoldLossPercent(q)) {
+    const legacy = q.gold_loss;
+    if (
+      legacy !== null &&
+      legacy !== undefined &&
+      Number.isFinite(Number(legacy)) &&
+      Number(legacy) > 0 &&
+      Number(legacy) <= 100
+    ) {
+      lossG = Number(legacy);
+    }
+  }
+
+  if (
+    weightG === null &&
+    refWeightG !== null &&
+    refWeightG !== undefined &&
+    Number.isFinite(Number(refWeightG))
+  ) {
+    weightG = Number(refWeightG);
+  }
+
   return { weightG, lossG };
 }
 
-export function formatQuoteGrams(q: Partial<Quote>): string | null {
-  const { weightG, lossG } = quoteGoldGrams(q);
+export function formatGramsLabel(
+  weightG: number | null,
+  lossG: number | null
+): string | null {
   const parts: string[] = [];
   if (weightG !== null) parts.push(`${fmtGram(weightG)}g`);
   if (lossG !== null) parts.push(`loss ${fmtGram(lossG)}g`);
   return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+export function formatQuoteGrams(
+  q: Partial<Quote>,
+  refWeightG?: number | null
+): string | null {
+  const { weightG, lossG } = quoteGoldGrams(q, refWeightG);
+  return formatGramsLabel(weightG, lossG);
 }
 
 function fmtGram(n: number): string {

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import type { QuotationStatus } from "@/lib/types";
+import { formatGramsLabel } from "@/lib/types";
 import type { ItemCompareRow, QuoteOption } from "@/lib/quotation-compare";
 import { bestValidOption } from "@/lib/quotation-compare";
 import { ItemPhotos } from "@/components/items/item-photos";
@@ -60,6 +61,13 @@ function initAwards(
   return initial;
 }
 
+function optionGramsLabel(option: QuoteOption): string | null {
+  return (
+    option.gramsLabel ??
+    formatGramsLabel(option.weightG, option.lossG)
+  );
+}
+
 function PriceCell({
   options,
   isLowest,
@@ -82,11 +90,12 @@ function PriceCell({
   }
 
   const best = quoted.reduce((a, b) => (a.total <= b.total ? a : b));
+  const grams = optionGramsLabel(best);
 
   return (
     <div
       className={cn(
-        "inline-block text-right",
+        "inline-block text-right min-w-[4.5rem]",
         isLowest && "rounded-md bg-green-50 px-2 py-1 dark:bg-green-950/40"
       )}
     >
@@ -98,23 +107,23 @@ function PriceCell({
       >
         {fmt(best.total)}
       </div>
+      <p
+        className={cn(
+          "text-[11px] tabular-nums mt-1 leading-tight",
+          grams
+            ? isLowestWeight
+              ? "font-medium text-sky-800 dark:text-sky-200"
+              : "text-muted-foreground"
+            : "text-muted-foreground/50"
+        )}
+      >
+        {grams ?? "—"}
+      </p>
       {quoted.length > 1 && (
         <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
           {best.variantLabel}
         </p>
       )}
-      {best.gramsLabel ? (
-        <p
-          className={cn(
-            "text-[11px] tabular-nums mt-1 leading-tight",
-            isLowestWeight
-              ? "font-medium text-sky-800 dark:text-sky-200"
-              : "text-muted-foreground"
-          )}
-        >
-          {best.gramsLabel}
-        </p>
-      ) : null}
     </div>
   );
 }

@@ -97,14 +97,15 @@ export async function loadQuotationCompareData(
       for (const quote of quotes) {
         const variant = variantsById.get(quote.variant_id);
         if (!variant) continue;
-        const { weightG, lossG } = quoteGoldGrams(quote);
+        const refWeightG = item.specs?.weight_g ?? null;
+        const { weightG, lossG } = quoteGoldGrams(quote, refWeightG);
         options.push({
           quoteId: quote.id,
           variantId: variant.id,
           variantLabel: variant.label,
           total: quoteTotal(quote),
           declined: !!quote.declined,
-          gramsLabel: formatQuoteGrams(quote),
+          gramsLabel: formatQuoteGrams(quote, refWeightG),
           weightG,
           lossG,
         });
