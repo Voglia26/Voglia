@@ -122,6 +122,8 @@ export type Quote = {
   variant_id: string;
   gold_loss: number | null;
   gold_loss_percent: number | null;
+  gold_weight_g: number | null;
+  gold_loss_g: number | null;
   total_gold_cost: number | null;
   diamond_cost: number | null;
   cost_per_carat: number | null;
@@ -231,6 +233,37 @@ export function resolveGoldLoss(q: Partial<Quote>): number {
     return Number(goldCost) * (Number(percent) / 100);
   }
   return Number(q.gold_loss) || 0;
+}
+
+export function quoteGoldGrams(q: Partial<Quote>): {
+  weightG: number | null;
+  lossG: number | null;
+} {
+  const weightG =
+    q.gold_weight_g !== null &&
+    q.gold_weight_g !== undefined &&
+    Number.isFinite(Number(q.gold_weight_g))
+      ? Number(q.gold_weight_g)
+      : null;
+  const lossG =
+    q.gold_loss_g !== null &&
+    q.gold_loss_g !== undefined &&
+    Number.isFinite(Number(q.gold_loss_g))
+      ? Number(q.gold_loss_g)
+      : null;
+  return { weightG, lossG };
+}
+
+export function formatQuoteGrams(q: Partial<Quote>): string | null {
+  const { weightG, lossG } = quoteGoldGrams(q);
+  const parts: string[] = [];
+  if (weightG !== null) parts.push(`${fmtGram(weightG)}g`);
+  if (lossG !== null) parts.push(`loss ${fmtGram(lossG)}g`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function fmtGram(n: number): string {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 export function normalizeStoneLines(raw: unknown): QuoteStoneLine[] {

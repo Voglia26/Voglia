@@ -63,9 +63,11 @@ function initAwards(
 function PriceCell({
   options,
   isLowest,
+  isLowestWeight,
 }: {
   options: QuoteOption[];
   isLowest: boolean;
+  isLowestWeight: boolean;
 }) {
   const quoted = validOptions(options);
   const allDeclined =
@@ -101,6 +103,18 @@ function PriceCell({
           {best.variantLabel}
         </p>
       )}
+      {best.gramsLabel ? (
+        <p
+          className={cn(
+            "text-[11px] tabular-nums mt-1 leading-tight",
+            isLowestWeight
+              ? "font-medium text-sky-800 dark:text-sky-200"
+              : "text-muted-foreground"
+          )}
+        >
+          {best.gramsLabel}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -133,6 +147,20 @@ export function ItemComparisonMatrix({
         const option = bestValidOption(row.byFactoryId[f.id] ?? []);
         if (!option) continue;
         if (min === null || option.total < min) min = option.total;
+      }
+      out[row.item.id] = min;
+    }
+    return out;
+  }, [rows, factories]);
+
+  const rowMinWeightG = useMemo(() => {
+    const out: Record<string, number | null> = {};
+    for (const row of rows) {
+      let min: number | null = null;
+      for (const f of factories) {
+        const option = bestValidOption(row.byFactoryId[f.id] ?? []);
+        if (!option?.weightG) continue;
+        if (min === null || option.weightG < min) min = option.weightG;
       }
       out[row.item.id] = min;
     }
@@ -225,7 +253,10 @@ export function ItemComparisonMatrix({
                     className="text-right font-medium px-3 py-3"
                     style={{ minWidth: factoryColWidth }}
                   >
-                    {f.name}
+                    <div>{f.name}</div>
+                    <div className="text-[10px] font-normal text-muted-foreground mt-0.5">
+                      Price · Grams
+                    </div>
                   </th>
                 ))}
                 <th className="text-left font-medium px-4 py-3 min-w-[220px] w-[22%] border-l bg-muted/50">
@@ -238,6 +269,8 @@ export function ItemComparisonMatrix({
                 const award = awards[row.item.id];
                 const quotingFactories = factoriesWithQuotes(row);
                 const minTotal = rowMinTotals[row.item.id];
+                const minWeightG = rowMinWeightG[row.item.id];
+                const refWeightG = row.item.specs?.weight_g;
                 const variantOptions = award
                   ? validOptions(row.byFactoryId[award.factoryId] ?? [])
                   : [];
@@ -260,6 +293,11 @@ export function ItemComparisonMatrix({
                         <span className="font-medium leading-snug">
                           {row.item.name || "(untitled)"}
                         </span>
+                        {refWeightG !== null && refWeightG !== undefined && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
+                            Ref. {refWeightG}g
+                          </p>
+                        )}
                       </div>
                     </td>
 
@@ -270,13 +308,22 @@ export function ItemComparisonMatrix({
                         best !== null &&
                         minTotal !== null &&
                         best.total === minTotal;
+                      const isLowestWeight =
+                        best !== null &&
+                        best.weightG !== null &&
+                        minWeightG !== null &&
+                        best.weightG === minWeightG;
 
                       return (
                         <td
                           key={f.id}
                           className="px-3 py-4 text-right align-middle"
                         >
-                          <PriceCell options={options} isLowest={isLowest} />
+                          <PriceCell
+                            options={options}
+                            isLowest={isLowest}
+                            isLowestWeight={isLowestWeight}
+                          />
                         </td>
                       );
                     })}

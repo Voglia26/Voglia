@@ -53,7 +53,11 @@ type GoldLossState = {
   percent: string;
 };
 
-type CostFieldKey = (typeof QUOTE_TOTAL_SUM_KEYS)[number] | "diamond_cost";
+type CostFieldKey =
+  | (typeof QUOTE_TOTAL_SUM_KEYS)[number]
+  | "diamond_cost"
+  | "gold_weight_g"
+  | "gold_loss_g";
 
 type Values = Partial<Record<CostFieldKey, string>>;
 type FieldKey = string;
@@ -72,6 +76,8 @@ function costFieldName(
 
 const ALL_COST_FIELDS: CostFieldKey[] = [
   "total_gold_cost",
+  "gold_weight_g",
+  "gold_loss_g",
   "diamond_cost",
   "labor",
   "other_fees",
@@ -79,6 +85,8 @@ const ALL_COST_FIELDS: CostFieldKey[] = [
 
 const COST_LABELS: Record<CostFieldKey, string> = {
   total_gold_cost: "Total gold cost",
+  gold_weight_g: "Gold weight (g)",
+  gold_loss_g: "Gold loss (g)",
   diamond_cost: "Diamond cost",
   labor: "Labor",
   other_fees: "Other fees",
@@ -295,6 +303,8 @@ function parseCostValues(
   const partial: Partial<Quote> = {
     gold_loss,
     gold_loss_percent,
+    gold_weight_g: num("gold_weight_g"),
+    gold_loss_g: num("gold_loss_g"),
     total_gold_cost,
     diamond_cost: num("diamond_cost"),
     cost_per_carat: null,
@@ -360,7 +370,7 @@ function readCostValuesFromForm(form: HTMLFormElement): Record<FieldKey, Values>
   for (const [key, raw] of fd.entries()) {
     if (typeof raw !== "string") continue;
     const match = key.match(
-      /^([0-9a-f-]{36})__([0-9a-f-]{36})__(total_gold_cost|diamond_cost|labor|other_fees)$/
+      /^([0-9a-f-]{36})__([0-9a-f-]{36})__(total_gold_cost|gold_weight_g|gold_loss_g|diamond_cost|labor|other_fees)$/
     );
     if (!match) continue;
     const [, assignmentId, variantId, colKey] = match;
@@ -587,6 +597,8 @@ export function FactoryForm({
           values: {
             gold_loss: parsed.gold_loss ?? null,
             gold_loss_percent: parsed.gold_loss_percent ?? null,
+            gold_weight_g: parsed.gold_weight_g ?? null,
+            gold_loss_g: parsed.gold_loss_g ?? null,
             total_gold_cost: parsed.total_gold_cost ?? null,
             diamond_cost: parsed.diamond_cost ?? null,
             cost_per_carat: null,
@@ -849,6 +861,68 @@ export function FactoryForm({
                                   handleCostInput(
                                     fk,
                                     "total_gold_cost",
+                                    e.currentTarget.value
+                                  )
+                                }
+                                className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label
+                                htmlFor={`${fk}-gold_weight_g`}
+                                className="text-xs font-medium text-muted-foreground"
+                              >
+                                {COST_LABELS.gold_weight_g}
+                              </label>
+                              <input
+                                id={`${fk}-gold_weight_g`}
+                                name={costFieldName(
+                                  row.assignmentId,
+                                  variant.id,
+                                  "gold_weight_g"
+                                )}
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                defaultValue={
+                                  initialRef.current.values[fk]
+                                    ?.gold_weight_g ?? ""
+                                }
+                                onInput={(e) =>
+                                  handleCostInput(
+                                    fk,
+                                    "gold_weight_g",
+                                    e.currentTarget.value
+                                  )
+                                }
+                                className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label
+                                htmlFor={`${fk}-gold_loss_g`}
+                                className="text-xs font-medium text-muted-foreground"
+                              >
+                                {COST_LABELS.gold_loss_g}
+                              </label>
+                              <input
+                                id={`${fk}-gold_loss_g`}
+                                name={costFieldName(
+                                  row.assignmentId,
+                                  variant.id,
+                                  "gold_loss_g"
+                                )}
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                defaultValue={
+                                  initialRef.current.values[fk]?.gold_loss_g ??
+                                  ""
+                                }
+                                onInput={(e) =>
+                                  handleCostInput(
+                                    fk,
+                                    "gold_loss_g",
                                     e.currentTarget.value
                                   )
                                 }

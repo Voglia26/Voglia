@@ -8,7 +8,7 @@ import type {
   QuotationFactory,
   Quote,
 } from "@/lib/types";
-import { quoteTotal } from "@/lib/types";
+import { quoteTotal, formatQuoteGrams, quoteGoldGrams } from "@/lib/types";
 
 export type QuoteOption = {
   quoteId: string;
@@ -16,6 +16,9 @@ export type QuoteOption = {
   variantLabel: string;
   total: number;
   declined: boolean;
+  gramsLabel: string | null;
+  weightG: number | null;
+  lossG: number | null;
 };
 
 export type ItemCompareRow = {
@@ -94,12 +97,16 @@ export async function loadQuotationCompareData(
       for (const quote of quotes) {
         const variant = variantsById.get(quote.variant_id);
         if (!variant) continue;
+        const { weightG, lossG } = quoteGoldGrams(quote);
         options.push({
           quoteId: quote.id,
           variantId: variant.id,
           variantLabel: variant.label,
           total: quoteTotal(quote),
           declined: !!quote.declined,
+          gramsLabel: formatQuoteGrams(quote),
+          weightG,
+          lossG,
         });
       }
 

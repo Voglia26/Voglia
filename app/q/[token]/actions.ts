@@ -13,6 +13,8 @@ import {
 export type QuoteValuesInput = {
   gold_loss: number | null;
   gold_loss_percent: number | null;
+  gold_weight_g: number | null;
+  gold_loss_g: number | null;
   total_gold_cost: number | null;
   diamond_cost: number | null;
   cost_per_carat: number | null;
@@ -162,6 +164,8 @@ export async function submitFactoryQuotation(
         variant_id: i.variantId,
         gold_loss: i.declined ? null : v?.gold_loss ?? null,
         gold_loss_percent: i.declined ? null : v?.gold_loss_percent ?? null,
+        gold_weight_g: i.declined ? null : v?.gold_weight_g ?? null,
+        gold_loss_g: i.declined ? null : v?.gold_loss_g ?? null,
         total_gold_cost: i.declined ? null : v?.total_gold_cost ?? null,
         diamond_cost: i.declined ? null : v?.diamond_cost ?? null,
         cost_per_carat: i.declined ? null : v?.cost_per_carat ?? null,

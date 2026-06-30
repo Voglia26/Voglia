@@ -8,6 +8,7 @@ import {
   QUOTE_COLUMNS,
   quoteTotal,
   quoteHasValue,
+  formatQuoteGrams,
   type QuoteColumnKey,
 } from "@/lib/types";
 import type { CompareRow } from "@/app/admin/(dash)/quotations/[id]/compare/page";
@@ -132,6 +133,9 @@ export function ComparisonTable({
                   onClick={() => toggleSort("total")}
                   align="right"
                 />
+                <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[100px] bg-muted/60 border-b">
+                  Grams
+                </th>
                 {QUOTE_COLUMNS.map((col) => (
                   <SortableHeader
                     key={col.key}
@@ -176,6 +180,13 @@ export function ComparisonTable({
                               {row.item.name || "(untitled)"}
                             </div>
                           )}
+                          {showItemHeader &&
+                            row.item.specs?.weight_g !== null &&
+                            row.item.specs?.weight_g !== undefined && (
+                              <p className="text-[11px] text-muted-foreground tabular-nums">
+                                Ref. {row.item.specs.weight_g}g
+                              </p>
+                            )}
                         </div>
                       </div>
                     </td>
@@ -202,6 +213,11 @@ export function ComparisonTable({
                       ) : (
                         fmt(row.total)
                       )}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums border-b text-xs text-muted-foreground">
+                      {row.hasValue
+                        ? formatQuoteGrams(row.quote) ?? "—"
+                        : "—"}
                     </td>
                     {QUOTE_COLUMNS.map((col) => (
                       <td
