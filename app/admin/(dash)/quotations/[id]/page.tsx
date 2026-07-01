@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizeItem } from "@/lib/items";
 import { loadQuotationCompareData, hasAnyQuotes } from "@/lib/quotation-compare";
 import type { Item, ItemWithVariants, Factory, QuotationFactory, ItemAssignment, Quotation, ItemVariant } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ export default async function QuotationEditorPage({
     supabase.from("quotations").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("items")
-      .select("*, item_variants(*)")
+      .select("*")
       .eq("quotation_id", id)
       .order("created_at", { ascending: true }),
     supabase.from("factories").select("*").order("name", { ascending: true }),
@@ -40,12 +41,33 @@ export default async function QuotationEditorPage({
   const quotation = qRes.data as Quotation | null;
   if (!quotation) notFound();
 
-  const items: ItemWithVariants[] = (itemsRes.data ?? []).map((raw) => {
-    const row = raw as Item & { item_variants: ItemVariant[] | null };
-    const reference_variants = (row.item_variants ?? [])
-      .filter((v) => v.item_id && !v.item_assignment_id)
-      .sort((a, b) => a.position - b.position);
-    return { ...row, reference_variants };
+  const rawItems = itemsRes.data ?? [];
+  const itemIds = rawItems.map((row) => row.id as string);
+
+  const { data: referenceVariantsData } =
+    itemIds.length > 0
+      ? await supabase
+          .from("item_variants")
+          .select("*")
+          .in("item_id", itemIds)
+          .is("item_assignment_id", null)
+          .order("position", { ascending: true })
+      : { data: [] as ItemVariant[] };
+
+  const variantsByItemId = new Map<string, ItemVariant[]>();
+  for (const variant of (referenceVariantsData ?? []) as ItemVariant[]) {
+    if (!variant.item_id) continue;
+    const list = variantsByItemId.get(variant.item_id) ?? [];
+    list.push(variant);
+    variantsByItemId.set(variant.item_id, list);
+  }
+
+  const items: ItemWithVariants[] = rawItems.map((raw) => {
+    const item = normalizeItem(raw as Parameters<typeof normalizeItem>[0]);
+    return {
+      ...item,
+      reference_variants: variantsByItemId.get(item.id) ?? [],
+    };
   });
   const factories: Factory[] = factoriesRes.data ?? [];
   const qfsRaw = (qfRes.data ?? []) as (QuotationFactory & {
