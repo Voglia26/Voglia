@@ -303,6 +303,42 @@ function fmtGram(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+/** Reference total carats from item specs (`specs.carats`). */
+export function itemRefCarats(item: {
+  specs?: ItemSpecs | null;
+}): number | null {
+  const carats = item.specs?.carats;
+  if (
+    carats === null ||
+    carats === undefined ||
+    !Number.isFinite(Number(carats)) ||
+    Number(carats) <= 0
+  ) {
+    return null;
+  }
+  return Number(carats);
+}
+
+/** Quote total ÷ item reference carats → "$X.XX/ct", or null if no carats. */
+export function formatQuoteCostPerCarat(
+  total: number,
+  refCarats: number | null
+): string | null {
+  if (
+    refCarats === null ||
+    refCarats <= 0 ||
+    !Number.isFinite(total) ||
+    total <= 0
+  ) {
+    return null;
+  }
+  const per = total / refCarats;
+  return `$${per.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}/ct`;
+}
+
 export function normalizeStoneLines(raw: unknown): QuoteStoneLine[] {
   if (!Array.isArray(raw)) return [];
   const out: QuoteStoneLine[] = [];

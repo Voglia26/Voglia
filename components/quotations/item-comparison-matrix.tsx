@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import type { QuotationStatus } from "@/lib/types";
-import { formatGramsLabel } from "@/lib/types";
+import { formatGramsLabel, itemRefCarats } from "@/lib/types";
 import type { ItemCompareRow, QuoteOption } from "@/lib/quotation-compare";
 import { bestValidOption } from "@/lib/quotation-compare";
 import { ItemPhotos } from "@/components/items/item-photos";
@@ -91,6 +91,7 @@ function PriceCell({
 
   const best = quoted.reduce((a, b) => (a.total <= b.total ? a : b));
   const grams = optionGramsLabel(best);
+  const costPerCarat = best.costPerCaratLabel;
 
   return (
     <div
@@ -119,6 +120,11 @@ function PriceCell({
       >
         {grams ?? "—"}
       </p>
+      {costPerCarat && (
+        <p className="text-[11px] tabular-nums mt-1 leading-tight text-muted-foreground">
+          {costPerCarat}
+        </p>
+      )}
       {quoted.length > 1 && (
         <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
           {best.variantLabel}
@@ -280,6 +286,7 @@ export function ItemComparisonMatrix({
                 const minTotal = rowMinTotals[row.item.id];
                 const minWeightG = rowMinWeightG[row.item.id];
                 const refWeightG = row.item.specs?.weight_g;
+                const refCarats = itemRefCarats(row.item);
                 const variantOptions = award
                   ? validOptions(row.byFactoryId[award.factoryId] ?? [])
                   : [];
@@ -299,14 +306,26 @@ export function ItemComparisonMatrix({
                           size="sm"
                           limit={1}
                         />
-                        <span className="font-medium leading-snug">
-                          {row.item.name || "(untitled)"}
-                        </span>
-                        {refWeightG !== null && refWeightG !== undefined && (
-                          <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
-                            Ref. {refWeightG}g
-                          </p>
-                        )}
+                        <div className="min-w-0">
+                          <span className="font-medium leading-snug block">
+                            {row.item.name || "(untitled)"}
+                          </span>
+                          {(refWeightG !== null && refWeightG !== undefined) ||
+                          refCarats !== null ? (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
+                              {[
+                                refWeightG !== null && refWeightG !== undefined
+                                  ? `Ref. ${refWeightG}g`
+                                  : null,
+                                refCarats !== null
+                                  ? `Ref. ${refCarats} ct`
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                     </td>
 

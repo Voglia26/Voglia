@@ -9,6 +9,8 @@ import {
   quoteTotal,
   quoteHasValue,
   formatQuoteGrams,
+  formatQuoteCostPerCarat,
+  itemRefCarats,
   type QuoteColumnKey,
 } from "@/lib/types";
 import type { CompareRow } from "@/app/admin/(dash)/quotations/[id]/compare/page";
@@ -133,9 +135,6 @@ export function ComparisonTable({
                   onClick={() => toggleSort("total")}
                   align="right"
                 />
-                <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[100px] bg-muted/60 border-b">
-                  Grams
-                </th>
                 {QUOTE_COLUMNS.map((col) => (
                   <SortableHeader
                     key={col.key}
@@ -158,6 +157,13 @@ export function ComparisonTable({
                   rowIdx > 0 ? tableRows[rowIdx - 1].item.id : null;
                 const showItemHeader = row.item.id !== prevItemId;
                 const qty = awards[row.quote.id] ?? "";
+                const refCarats = itemRefCarats(row.item);
+                const gramsLabel = row.hasValue
+                  ? formatQuoteGrams(row.quote, row.item.specs?.weight_g ?? null)
+                  : null;
+                const costPerCaratLabel = row.hasValue
+                  ? formatQuoteCostPerCarat(row.total, refCarats)
+                  : null;
 
                 return (
                   <tr key={row.quote.id} className={rowBg}>
@@ -181,12 +187,21 @@ export function ComparisonTable({
                             </div>
                           )}
                           {showItemHeader &&
-                            row.item.specs?.weight_g !== null &&
-                            row.item.specs?.weight_g !== undefined && (
+                            (row.item.specs?.weight_g !== null &&
+                              row.item.specs?.weight_g !== undefined) ||
+                            refCarats !== null ? (
                               <p className="text-[11px] text-muted-foreground tabular-nums">
-                                Ref. {row.item.specs.weight_g}g
+                                {[
+                                  row.item.specs?.weight_g !== null &&
+                                  row.item.specs?.weight_g !== undefined
+                                    ? `Ref. ${row.item.specs.weight_g}g`
+                                    : null,
+                                  refCarats !== null ? `Ref. ${refCarats} ct` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
                               </p>
-                            )}
+                            ) : null}
                         </div>
                       </div>
                     </td>
@@ -201,7 +216,7 @@ export function ComparisonTable({
                         </p>
                       ) : null}
                     </td>
-                    <td className="px-3 py-3 text-right font-heading text-lg tabular-nums border-b">
+                    <td className="px-3 py-3 text-right border-b align-top">
                       {!row.hasValue ? (
                         row.quote.declined ? (
                           <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em]">
@@ -211,13 +226,22 @@ export function ComparisonTable({
                           <span className="text-muted-foreground">—</span>
                         )
                       ) : (
-                        fmt(row.total)
+                        <div className="inline-block text-right min-w-[4.5rem]">
+                          <div className="font-heading text-lg tabular-nums leading-none">
+                            {fmt(row.total)}
+                          </div>
+                          {gramsLabel && (
+                            <p className="text-[11px] tabular-nums mt-1 leading-tight text-muted-foreground">
+                              {gramsLabel}
+                            </p>
+                          )}
+                          {costPerCaratLabel && (
+                            <p className="text-[11px] tabular-nums mt-1 leading-tight text-muted-foreground">
+                              {costPerCaratLabel}
+                            </p>
+                          )}
+                        </div>
                       )}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums border-b text-xs text-muted-foreground">
-                      {row.hasValue
-                        ? formatQuoteGrams(row.quote) ?? "—"
-                        : "—"}
                     </td>
                     {QUOTE_COLUMNS.map((col) => (
                       <td
