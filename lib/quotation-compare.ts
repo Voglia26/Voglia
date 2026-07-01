@@ -14,6 +14,7 @@ import {
   quoteGoldGrams,
   itemRefCarats,
   formatQuoteCostPerCarat,
+  formatQuoteStoneCaratsLabel,
 } from "@/lib/types";
 
 export type QuoteOption = {
@@ -25,6 +26,7 @@ export type QuoteOption = {
   gramsLabel: string | null;
   weightG: number | null;
   lossG: number | null;
+  quotedCaratsLabel: string | null;
   costPerCaratLabel: string | null;
 };
 
@@ -117,6 +119,7 @@ export async function loadQuotationCompareData(
           gramsLabel: formatQuoteGrams(quote, refWeightG),
           weightG,
           lossG,
+          quotedCaratsLabel: formatQuoteStoneCaratsLabel(quote),
           costPerCaratLabel: formatQuoteCostPerCarat(total, refCarats),
         });
       }

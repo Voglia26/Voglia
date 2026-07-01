@@ -91,6 +91,7 @@ function PriceCell({
 
   const best = quoted.reduce((a, b) => (a.total <= b.total ? a : b));
   const grams = optionGramsLabel(best);
+  const quotedCarats = best.quotedCaratsLabel;
   const costPerCarat = best.costPerCaratLabel;
 
   return (
@@ -120,6 +121,11 @@ function PriceCell({
       >
         {grams ?? "—"}
       </p>
+      {quotedCarats && (
+        <p className="text-[11px] tabular-nums mt-1 leading-tight text-muted-foreground">
+          {quotedCarats}
+        </p>
+      )}
       {costPerCarat && (
         <p className="text-[11px] tabular-nums mt-1 leading-tight text-muted-foreground">
           {costPerCarat}

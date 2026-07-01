@@ -10,6 +10,7 @@ import {
   quoteHasValue,
   formatQuoteGrams,
   formatQuoteCostPerCarat,
+  formatQuoteStoneCaratsLabel,
   itemRefCarats,
   type QuoteColumnKey,
 } from "@/lib/types";
@@ -161,6 +162,9 @@ export function ComparisonTable({
                 const gramsLabel = row.hasValue
                   ? formatQuoteGrams(row.quote, row.item.specs?.weight_g ?? null)
                   : null;
+                const quotedCaratsLabel = row.hasValue
+                  ? formatQuoteStoneCaratsLabel(row.quote)
+                  : null;
                 const costPerCaratLabel = row.hasValue
                   ? formatQuoteCostPerCarat(row.total, refCarats)
                   : null;
@@ -233,6 +237,11 @@ export function ComparisonTable({
                           {gramsLabel && (
                             <p className="text-[11px] tabular-nums mt-1 leading-tight text-muted-foreground">
                               {gramsLabel}
+                            </p>
+                          )}
+                          {quotedCaratsLabel && (
+                            <p className="text-[11px] tabular-nums mt-1 leading-tight text-muted-foreground">
+                              {quotedCaratsLabel}
                             </p>
                           )}
                           {costPerCaratLabel && (

@@ -339,6 +339,24 @@ export function formatQuoteCostPerCarat(
   })}/ct`;
 }
 
+/** Sum of total_carats across quote stone_lines (factory-quoted stone weight). */
+export function quoteStoneCaratsTotal(q: Partial<Quote>): number | null {
+  const lines = normalizeStoneLines(q.stone_lines);
+  if (lines.length === 0) return null;
+  const sum = lines.reduce((s, line) => s + line.total_carats, 0);
+  if (!Number.isFinite(sum) || sum <= 0) return null;
+  return sum;
+}
+
+export function formatQuoteStoneCaratsLabel(q: Partial<Quote>): string | null {
+  const total = quoteStoneCaratsTotal(q);
+  if (total === null) return null;
+  return `${total.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ct`;
+}
+
 export function normalizeStoneLines(raw: unknown): QuoteStoneLine[] {
   if (!Array.isArray(raw)) return [];
   const out: QuoteStoneLine[] = [];
