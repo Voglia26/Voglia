@@ -66,7 +66,16 @@ export function CompareSheet({
     document.body.style.overflow = "hidden";
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key !== "Escape") return;
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+      close();
     };
     window.addEventListener("keydown", onKeyDown);
 
@@ -133,6 +142,7 @@ export function CompareSheet({
                 </p>
               ) : (
                 <ItemComparisonMatrix
+                  key={`compare-${quotationId}`}
                   quotationId={quotationId}
                   quotationStatus={quotationStatus}
                   rows={rows}
