@@ -297,7 +297,7 @@ export function ComparisonTable({
                       )}
                     </td>
                     <td className="px-3 py-3 border-b align-top">
-                      {showItemHeader && row.hasValue ? (
+                      {showItemHeader ? (
                         <Textarea
                           rows={2}
                           className="text-xs min-h-[56px] resize-y"

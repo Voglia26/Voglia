@@ -22,7 +22,6 @@ type ItemAward = {
   factoryId: string;
   quoteId: string;
   quantity: number;
-  notes: string;
 };
 
 function fmt(n: number): string {
@@ -57,7 +56,6 @@ function initAwards(
         factoryId: best.factoryId,
         quoteId: best.quoteId,
         quantity: 1,
-        notes: "",
       };
     }
   }
@@ -160,6 +158,7 @@ export function ItemComparisonMatrix({
   const [awards, setAwards] = useState<Record<string, ItemAward>>(() =>
     initAwards(rows, factories)
   );
+  const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
@@ -213,7 +212,6 @@ export function ItemComparisonMatrix({
         factoryId,
         quoteId: best.quoteId,
         quantity: prev[row.item.id]?.quantity ?? 1,
-        notes: prev[row.item.id]?.notes ?? "",
       },
     }));
   }
@@ -233,7 +231,7 @@ export function ItemComparisonMatrix({
           variant_id: option.variantId,
           quote_id: award.quoteId,
           quantity: award.quantity,
-          notes: award.notes.trim() || null,
+          notes: notesByItem[row.item.id]?.trim() || null,
         };
       })
       .filter((x): x is AwardInput => x !== null);
@@ -465,19 +463,14 @@ export function ItemComparisonMatrix({
                           rows={3}
                           className="text-xs min-h-[72px] resize-y"
                           placeholder="e.g. 5× YG, 3× WG, size 7…"
-                          disabled={!award || quotationStatus === "closed"}
-                          value={award?.notes ?? ""}
-                          onChange={(e) => {
-                            const notes = e.target.value;
-                            setAwards((prev) => {
-                              const cur = prev[row.item.id];
-                              if (!cur) return prev;
-                              return {
-                                ...prev,
-                                [row.item.id]: { ...cur, notes },
-                              };
-                            });
-                          }}
+                          disabled={quotationStatus === "closed"}
+                          value={notesByItem[row.item.id] ?? ""}
+                          onChange={(e) =>
+                            setNotesByItem((prev) => ({
+                              ...prev,
+                              [row.item.id]: e.target.value,
+                            }))
+                          }
                         />
                       )}
                     </td>
