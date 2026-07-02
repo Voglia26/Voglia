@@ -8,6 +8,7 @@ import { bestValidOption } from "@/lib/quotation-compare";
 import { ItemPhotos } from "@/components/items/item-photos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -21,6 +22,7 @@ type ItemAward = {
   factoryId: string;
   quoteId: string;
   quantity: number;
+  notes: string;
 };
 
 function fmt(n: number): string {
@@ -55,6 +57,7 @@ function initAwards(
         factoryId: best.factoryId,
         quoteId: best.quoteId,
         quantity: 1,
+        notes: "",
       };
     }
   }
@@ -210,6 +213,7 @@ export function ItemComparisonMatrix({
         factoryId,
         quoteId: best.quoteId,
         quantity: prev[row.item.id]?.quantity ?? 1,
+        notes: prev[row.item.id]?.notes ?? "",
       },
     }));
   }
@@ -229,6 +233,7 @@ export function ItemComparisonMatrix({
           variant_id: option.variantId,
           quote_id: award.quoteId,
           quantity: award.quantity,
+          notes: award.notes.trim() || null,
         };
       })
       .filter((x): x is AwardInput => x !== null);
@@ -282,6 +287,9 @@ export function ItemComparisonMatrix({
                 ))}
                 <th className="text-left font-medium px-4 py-3 min-w-[220px] w-[22%] border-l bg-muted/50">
                   Winner
+                </th>
+                <th className="text-left font-medium px-4 py-3 min-w-[200px] w-[20%] border-l bg-muted/50">
+                  Details / Notes
                 </th>
               </tr>
             </thead>
@@ -446,6 +454,31 @@ export function ItemComparisonMatrix({
                             />
                           </div>
                         </div>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-4 align-top border-l">
+                      {quotingFactories.length === 0 ? (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      ) : (
+                        <Textarea
+                          rows={3}
+                          className="text-xs min-h-[72px] resize-y"
+                          placeholder="e.g. 5× YG, 3× WG, size 7…"
+                          disabled={!award || quotationStatus === "closed"}
+                          value={award?.notes ?? ""}
+                          onChange={(e) => {
+                            const notes = e.target.value;
+                            setAwards((prev) => {
+                              const cur = prev[row.item.id];
+                              if (!cur) return prev;
+                              return {
+                                ...prev,
+                                [row.item.id]: { ...cur, notes },
+                              };
+                            });
+                          }}
+                        />
                       )}
                     </td>
                   </tr>

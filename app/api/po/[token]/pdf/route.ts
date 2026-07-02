@@ -47,6 +47,15 @@ const styles = StyleSheet.create({
   qty: { fontSize: 14, fontWeight: 700 },
   sku: { color: "#666", fontSize: 8 },
   specs: { color: "#555", fontSize: 9, marginTop: 2 },
+  orderNotes: {
+    color: "#333",
+    fontSize: 9,
+    marginTop: 4,
+    padding: 6,
+    backgroundColor: "#f4f4f5",
+    borderRadius: 3,
+  },
+  orderNotesLabel: { color: "#666", fontSize: 7, marginBottom: 2 },
   columnsRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 6 },
   col: { width: "33.33%", marginBottom: 4 },
   colLabel: { color: "#777", fontSize: 8 },
@@ -177,6 +186,18 @@ export async function GET(
             specs ? React.createElement(Text, { style: styles.specs }, specs) : null,
             pi.item.description
               ? React.createElement(Text, { style: styles.specs }, pi.item.description)
+              : null,
+            pi.notes
+              ? React.createElement(
+                  View,
+                  { style: styles.orderNotes },
+                  React.createElement(
+                    Text,
+                    { style: styles.orderNotesLabel },
+                    "Details / Notes"
+                  ),
+                  React.createElement(Text, {}, pi.notes)
+                )
               : null,
             React.createElement(
               View,

@@ -33,7 +33,7 @@ export async function createShipmentFromPurchaseOrder(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const { data: poItems, error: itemsErr } = await supabase
     .from("purchase_order_items")
-    .select("id, quantity, item:items(id, name, sku, photo_urls)")
+    .select("id, quantity, notes, item:items(id, name, sku, photo_urls)")
     .eq("purchase_order_id", purchaseOrderId);
 
   if (itemsErr) return { ok: false, error: itemsErr.message };
@@ -59,6 +59,7 @@ export async function createShipmentFromPurchaseOrder(
   type PoItemRow = {
     id: string;
     quantity: number;
+    notes: string | null;
     item: Item | Item[] | null;
   };
 
@@ -71,6 +72,7 @@ export async function createShipmentFromPurchaseOrder(
       sku: item ? resolveItemSku(item) : null,
       photo_url: item?.photo_urls?.[0] ?? null,
       quantity: pi.quantity,
+      notes: pi.notes?.trim() || null,
       position: idx,
     };
   });

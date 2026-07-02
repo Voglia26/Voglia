@@ -17,6 +17,7 @@ import {
 import type { CompareRow } from "@/app/admin/(dash)/quotations/[id]/compare/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 import { generatePurchaseOrders, type AwardInput } from "@/app/admin/(dash)/quotations/[id]/compare/actions";
@@ -32,8 +33,6 @@ export function ComparisonTable({
   quotationStatus: QuotationStatus;
   rows: CompareRow[];
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("total");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [awards, setAwards] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
     const bestByItem = new Map<string, { quoteId: string; total: number }>();
@@ -50,6 +49,9 @@ export function ComparisonTable({
     }
     return initial;
   });
+  const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
+  const [sortKey, setSortKey] = useState<SortKey>("total");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
@@ -94,6 +96,7 @@ export function ComparisonTable({
           factory_id: row.factory.id,
           quote_id: row.quote.id,
           quantity,
+          notes: notesByItem[row.item.id]?.trim() || null,
         };
       })
       .filter((x): x is AwardInput => x !== null);
@@ -148,6 +151,9 @@ export function ComparisonTable({
                 ))}
                 <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[90px] bg-muted/60 border-b">
                   Qty
+                </th>
+                <th className="px-3 py-3 eyebrow text-[10px] min-w-[180px] bg-muted/60 border-b">
+                  Details / Notes
                 </th>
               </tr>
             </thead>
@@ -289,6 +295,23 @@ export function ComparisonTable({
                       ) : (
                         <Badge variant="outline">—</Badge>
                       )}
+                    </td>
+                    <td className="px-3 py-3 border-b align-top">
+                      {showItemHeader && row.hasValue ? (
+                        <Textarea
+                          rows={2}
+                          className="text-xs min-h-[56px] resize-y"
+                          placeholder="e.g. 5× YG, 3× WG, size 7…"
+                          disabled={quotationStatus === "closed"}
+                          value={notesByItem[row.item.id] ?? ""}
+                          onChange={(e) =>
+                            setNotesByItem((prev) => ({
+                              ...prev,
+                              [row.item.id]: e.target.value,
+                            }))
+                          }
+                        />
+                      ) : null}
                     </td>
                   </tr>
                 );

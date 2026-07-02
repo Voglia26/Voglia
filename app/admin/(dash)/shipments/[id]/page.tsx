@@ -92,6 +92,16 @@ export default async function ShipmentDetailPage({
                       <p className="text-sm text-muted-foreground">
                         SKU {item.sku ?? "—"}
                       </p>
+                      {item.notes && (
+                        <div className="mt-2">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                            Details / Notes
+                          </p>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-3">
+                            {item.notes}
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <p className="text-sm tabular-nums font-medium shrink-0">
                       × {item.quantity}

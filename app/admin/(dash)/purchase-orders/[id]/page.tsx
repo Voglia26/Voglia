@@ -110,6 +110,14 @@ export default async function PurchaseOrderDetailPage({
                 {pi.item.sku && (
                   <p className="text-xs text-muted-foreground">SKU: {pi.item.sku}</p>
                 )}
+                {pi.notes && (
+                  <div className="mt-2 rounded-md border border-border/80 bg-muted/30 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                      Details / Notes
+                    </p>
+                    <p className="text-sm whitespace-pre-wrap">{pi.notes}</p>
+                  </div>
+                )}
                 <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
                   {QUOTE_COLUMNS.map((col) => (
                     <div key={col.key}>

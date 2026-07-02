@@ -4,6 +4,7 @@ import type { Item, ItemVariant, Quote, PurchaseOrder, Factory, Quotation } from
 export type POItemDetail = {
   id: string;
   quantity: number;
+  notes: string | null;
   item: Item;
   quote: Quote;
   variant: ItemVariant | null;
@@ -35,7 +36,7 @@ async function loadPurchaseOrder(
   let query = supabase
     .from("purchase_orders")
     .select(
-      "*, factory:factories(*), quotation:quotations(*), purchase_order_items(id, quantity, item:items(*), quote:quotes(*, variant:item_variants(*)))"
+      "*, factory:factories(*), quotation:quotations(*), purchase_order_items(id, quantity, notes, item:items(*), quote:quotes(*, variant:item_variants(*)))"
     );
   if (where.id) query = query.eq("id", where.id);
   if (where.token) query = query.eq("token", where.token);
@@ -49,6 +50,7 @@ async function loadPurchaseOrder(
     purchase_order_items: {
       id: string;
       quantity: number;
+      notes: string | null;
       item: Item | Item[];
       quote: (Quote & { variant?: ItemVariant | ItemVariant[] | null }) | (Quote & { variant?: ItemVariant | ItemVariant[] | null })[];
     }[];
@@ -68,6 +70,7 @@ async function loadPurchaseOrder(
     return {
       id: p.id,
       quantity: p.quantity,
+      notes: p.notes ?? null,
       item: Array.isArray(p.item) ? p.item[0] : p.item,
       quote: quote as Quote,
       variant,

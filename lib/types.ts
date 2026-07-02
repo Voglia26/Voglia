@@ -161,6 +161,7 @@ export type PurchaseOrderItem = {
   item_id: string;
   quote_id: string;
   quantity: number;
+  notes: string | null;
 };
 
 export type Shipment = {
@@ -188,6 +189,7 @@ export type ShipmentItem = {
   photo_url: string | null;
   quantity: number;
   position: number;
+  notes: string | null;
 };
 
 export const QUOTE_COLUMNS = [

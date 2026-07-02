@@ -79,6 +79,14 @@ export default async function PublicPOPage({
                       {pi.item.description}
                     </p>
                   )}
+                  {pi.notes && (
+                    <div className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1">
+                        Details / Notes
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap">{pi.notes}</p>
+                    </div>
+                  )}
                   {pi.item.specs && <Specs specs={pi.item.specs} />}
                   <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
                     {QUOTE_COLUMNS.map((col) => (
