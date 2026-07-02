@@ -449,29 +449,28 @@ export function ItemComparisonMatrix({
                             />
                           </div>
 
-                          {quotationStatus !== "closed" && (
-                            <div className="space-y-1 pt-1">
-                              <label
-                                htmlFor={`compare-notes-${row.item.id}`}
-                                className="text-xs text-muted-foreground"
-                              >
-                                Details / Notes
-                              </label>
-                              <Textarea
-                                id={`compare-notes-${row.item.id}`}
-                                rows={2}
-                                className="min-h-[56px] text-xs text-foreground resize-y"
-                                placeholder="e.g. 5× YG, 3× WG, size 7…"
-                                value={notesByItem[row.item.id] ?? ""}
-                                onChange={(e) =>
-                                  setNotesByItem((prev) => ({
-                                    ...prev,
-                                    [row.item.id]: e.target.value,
-                                  }))
-                                }
-                              />
-                            </div>
-                          )}
+                          <div className="space-y-1 pt-1">
+                            <label
+                              htmlFor={`compare-notes-${row.item.id}`}
+                              className="text-xs text-muted-foreground"
+                            >
+                              Details / Notes
+                            </label>
+                            <Textarea
+                              id={`compare-notes-${row.item.id}`}
+                              rows={2}
+                              readOnly={quotationStatus === "closed"}
+                              className="min-h-[56px] text-xs text-foreground resize-y"
+                              placeholder="e.g. 5× YG, 3× WG, size 7…"
+                              value={notesByItem[row.item.id] ?? ""}
+                              onChange={(e) =>
+                                setNotesByItem((prev) => ({
+                                  ...prev,
+                                  [row.item.id]: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
                         </div>
                       )}
                     </td>
