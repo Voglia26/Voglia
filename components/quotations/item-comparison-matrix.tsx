@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { QuotationStatus } from "@/lib/types";
 import { formatGramsLabel, itemRefCarats } from "@/lib/types";
 import type { ItemCompareRow, QuoteOption } from "@/lib/quotation-compare";
@@ -8,6 +8,7 @@ import { bestValidOption } from "@/lib/quotation-compare";
 import { ItemPhotos } from "@/components/items/item-photos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -140,45 +141,6 @@ function PriceCell({
   );
 }
 
-const notesColumnClass =
-  "sticky right-0 z-20 border-l bg-background shadow-[-6px_0_10px_-8px_rgba(0,0,0,0.15)] dark:shadow-[-6px_0_10px_-8px_rgba(0,0,0,0.45)]";
-
-function CompareNotesInput({
-  itemId,
-  quotationStatus,
-  inputRef,
-}: {
-  itemId: string;
-  quotationStatus: QuotationStatus;
-  inputRef: (el: HTMLTextAreaElement | null) => void;
-}) {
-  const readOnly = quotationStatus === "closed";
-
-  return (
-    <div
-      className="relative z-20 min-w-[180px] pointer-events-auto"
-      onPointerDown={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <textarea
-        ref={inputRef}
-        id={`compare-notes-${itemId}`}
-        rows={3}
-        readOnly={readOnly}
-        aria-label="Details and notes for factory"
-        className={cn(
-          "block min-h-[72px] w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-xs shadow-xs outline-none pointer-events-auto",
-          "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
-          readOnly && "cursor-not-allowed opacity-60"
-        )}
-        placeholder="e.g. 5× YG, 3× WG, size 7…"
-        defaultValue=""
-      />
-    </div>
-  );
-}
-
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -196,7 +158,7 @@ export function ItemComparisonMatrix({
   const [awards, setAwards] = useState<Record<string, ItemAward>>(() =>
     initAwards(rows, factories)
   );
-  const notesRefs = useRef(new Map<string, HTMLTextAreaElement>());
+  const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
   const [submitting, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
@@ -254,11 +216,6 @@ export function ItemComparisonMatrix({
     }));
   }
 
-  function setNotesRef(itemId: string, el: HTMLTextAreaElement | null) {
-    if (el) notesRefs.current.set(itemId, el);
-    else notesRefs.current.delete(itemId);
-  }
-
   function handleGenerate() {
     setErr(null);
     const payload: AwardInput[] = rows
@@ -274,7 +231,7 @@ export function ItemComparisonMatrix({
           variant_id: option.variantId,
           quote_id: award.quoteId,
           quantity: award.quantity,
-          notes: notesRefs.current.get(row.item.id)?.value.trim() || null,
+          notes: notesByItem[row.item.id]?.trim() || null,
         };
       })
       .filter((x): x is AwardInput => x !== null);
@@ -326,17 +283,8 @@ export function ItemComparisonMatrix({
                     </div>
                   </th>
                 ))}
-                <th className="text-left font-medium px-4 py-3 min-w-[220px] w-[22%] border-l bg-muted/50">
-                  Winner
-                </th>
-                <th
-                  className={cn(
-                    "text-left font-medium px-4 py-3 min-w-[200px] w-[20%]",
-                    notesColumnClass,
-                    "z-30 bg-muted/50"
-                  )}
-                >
-                  Details / Notes
+                <th className="text-left font-medium px-4 py-3 min-w-[280px] w-[28%] border-l bg-muted/50">
+                  Winner · Details
                 </th>
               </tr>
             </thead>
@@ -500,25 +448,31 @@ export function ItemComparisonMatrix({
                               }}
                             />
                           </div>
-                        </div>
-                      )}
-                    </td>
 
-                    <td
-                      className={cn(
-                        "px-4 py-4 align-top",
-                        notesColumnClass,
-                        idx % 2 === 1 && "bg-muted/20"
-                      )}
-                    >
-                      {quotingFactories.length === 0 ? (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      ) : (
-                        <CompareNotesInput
-                          itemId={row.item.id}
-                          quotationStatus={quotationStatus}
-                          inputRef={(el) => setNotesRef(row.item.id, el)}
-                        />
+                          {quotationStatus !== "closed" && (
+                            <div className="space-y-1 pt-1">
+                              <label
+                                htmlFor={`compare-notes-${row.item.id}`}
+                                className="text-xs text-muted-foreground"
+                              >
+                                Details / Notes
+                              </label>
+                              <Textarea
+                                id={`compare-notes-${row.item.id}`}
+                                rows={2}
+                                className="min-h-[56px] text-xs text-foreground resize-y"
+                                placeholder="e.g. 5× YG, 3× WG, size 7…"
+                                value={notesByItem[row.item.id] ?? ""}
+                                onChange={(e) =>
+                                  setNotesByItem((prev) => ({
+                                    ...prev,
+                                    [row.item.id]: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>

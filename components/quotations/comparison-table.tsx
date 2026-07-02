@@ -298,25 +298,19 @@ export function ComparisonTable({
                     </td>
                     <td className="px-3 py-3 border-b align-top">
                       {showItemHeader ? (
-                        <div
-                          className="relative z-20 min-w-[160px]"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Textarea
-                            rows={2}
-                            readOnly={quotationStatus === "closed"}
-                            className="text-xs min-h-[56px] resize-y bg-background"
-                            placeholder="e.g. 5× YG, 3× WG, size 7…"
-                            value={notesByItem[row.item.id] ?? ""}
-                            onChange={(e) =>
-                              setNotesByItem((prev) => ({
-                                ...prev,
-                                [row.item.id]: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
+                        <Textarea
+                          rows={2}
+                          className="text-xs min-h-[56px] resize-y bg-background text-foreground"
+                          placeholder="e.g. 5× YG, 3× WG, size 7…"
+                          disabled={quotationStatus === "closed"}
+                          value={notesByItem[row.item.id] ?? ""}
+                          onChange={(e) =>
+                            setNotesByItem((prev) => ({
+                              ...prev,
+                              [row.item.id]: e.target.value,
+                            }))
+                          }
+                        />
                       ) : null}
                     </td>
                   </tr>

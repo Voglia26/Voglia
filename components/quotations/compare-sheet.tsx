@@ -65,25 +65,10 @@ export function CompareSheet({
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      const target = e.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement
-      ) {
-        return;
-      }
-      close();
-    };
-    window.addEventListener("keydown", onKeyDown);
-
     return () => {
       document.body.style.overflow = prevOverflow;
-      window.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, close]);
+  }, [open]);
 
   return (
     <>
@@ -102,10 +87,21 @@ export function CompareSheet({
         createPortal(
           <div
             role="dialog"
-            aria-modal="true"
             aria-labelledby="compare-title"
             className="z-[100] flex flex-col bg-background"
             style={FULLSCREEN_STYLE}
+            onKeyDown={(e) => {
+              if (e.key !== "Escape") return;
+              const target = e.target;
+              if (
+                target instanceof HTMLInputElement ||
+                target instanceof HTMLTextAreaElement ||
+                target instanceof HTMLSelectElement
+              ) {
+                return;
+              }
+              close();
+            }}
           >
             <header className="relative shrink-0 border-b px-6 py-4 pr-14">
               <h2
