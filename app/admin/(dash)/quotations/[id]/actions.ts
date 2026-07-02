@@ -99,11 +99,12 @@ async function syncReferenceVariants(
 
   for (const id of existingIds) {
     if (!keepIds.has(id)) {
-      await client
+      const { error } = await client
         .from("item_variants")
         .delete()
         .eq("id", id)
         .is("item_assignment_id", null);
+      if (error) throw new Error(error.message);
     }
   }
 
@@ -117,13 +118,15 @@ async function syncReferenceVariants(
       position: i,
     };
     if (v.id && existingIds.has(v.id)) {
-      await client
+      const { error } = await client
         .from("item_variants")
         .update(payload)
         .eq("id", v.id)
         .is("item_assignment_id", null);
+      if (error) throw new Error(error.message);
     } else {
-      await client.from("item_variants").insert(payload);
+      const { error } = await client.from("item_variants").insert(payload);
+      if (error) throw new Error(error.message);
     }
   }
 }

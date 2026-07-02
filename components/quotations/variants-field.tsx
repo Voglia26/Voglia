@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,38 +13,25 @@ export type VariantDraft = {
 };
 
 export function VariantsField({
-  defaultVariants = [],
+  variants,
+  onChange,
 }: {
-  defaultVariants?: VariantDraft[];
+  variants: VariantDraft[];
+  onChange: (variants: VariantDraft[]) => void;
 }) {
-  const [variants, setVariants] = useState<VariantDraft[]>(() =>
-    defaultVariants.length > 0
-      ? defaultVariants.map((v) => ({
-          id: v.id,
-          label: v.label,
-          description: v.description ?? "",
-        }))
-      : []
-  );
-
   function addVariant() {
-    setVariants((prev) => [
-      ...prev,
-      { label: "", description: "" },
-    ]);
+    onChange([...variants, { label: "", description: "" }]);
   }
 
   function removeVariant(index: number) {
-    setVariants((prev) => prev.filter((_, i) => i !== index));
+    onChange(variants.filter((_, i) => i !== index));
   }
 
   function updateVariant(
     index: number,
     patch: Partial<Pick<VariantDraft, "label" | "description">>
   ) {
-    setVariants((prev) =>
-      prev.map((v, i) => (i === index ? { ...v, ...patch } : v))
-    );
+    onChange(variants.map((v, i) => (i === index ? { ...v, ...patch } : v)));
   }
 
   return (
@@ -104,11 +90,6 @@ export function VariantsField({
           ))}
         </div>
       )}
-      <input
-        type="hidden"
-        name="variants_json"
-        value={JSON.stringify(variants)}
-      />
     </div>
   );
 }

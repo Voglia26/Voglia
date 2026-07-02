@@ -19,7 +19,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { PhotoUpload } from "@/components/items/photo-upload";
 import { ItemPhotos } from "@/components/items/item-photos";
 import { addItem, updateItem, deleteItem } from "@/app/admin/(dash)/quotations/[id]/actions";
-import { VariantsField } from "@/components/quotations/variants-field";
+import { VariantsField, type VariantDraft } from "@/components/quotations/variants-field";
 
 export function ItemsSection({
   quotationId,
@@ -123,6 +123,7 @@ export function ItemsSection({
           </DialogHeader>
           {editing && (
             <ItemForm
+              key={editing.id}
               quotationId={quotationId}
               item={editing}
               onSubmit={async (fd) => {
@@ -149,8 +150,34 @@ function ItemForm({
   onSubmit: (fd: FormData) => Promise<void>;
   submitLabel: string;
 }) {
+  const [variants, setVariants] = useState<VariantDraft[]>(() =>
+    item
+      ? item.reference_variants.map((v) => ({
+          id: v.id,
+          label: v.label,
+          description: v.description ?? "",
+        }))
+      : []
+  );
+
+  async function handleSubmit(formData: FormData) {
+    formData.set(
+      "variants_json",
+      JSON.stringify(
+        variants
+          .map((v) => ({
+            id: v.id,
+            label: v.label.trim(),
+            description: v.description.trim(),
+          }))
+          .filter((v) => v.label.length > 0)
+      )
+    );
+    await onSubmit(formData);
+  }
+
   return (
-    <form action={onSubmit} className="flex min-h-0 flex-1 flex-col">
+    <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-2">
       {item && <input type="hidden" name="id" value={item.id} />}
       <input type="hidden" name="quotation_id" value={quotationId} />
@@ -229,13 +256,7 @@ function ItemForm({
         </div>
       </div>
 
-      <VariantsField
-        defaultVariants={item?.reference_variants.map((v) => ({
-          id: v.id,
-          label: v.label,
-          description: v.description ?? "",
-        }))}
-      />
+      <VariantsField variants={variants} onChange={setVariants} />
       </div>
 
       <DialogFooter className="sticky bottom-0 z-10 shrink-0 border-t bg-popover px-4 py-4 mx-0 mb-0 mt-0 rounded-none sm:justify-end">
