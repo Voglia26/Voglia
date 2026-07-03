@@ -12,6 +12,7 @@ import { ItemsSection } from "@/components/quotations/items-section";
 import { AssignmentMatrix } from "@/components/quotations/assignment-matrix";
 import { ShareLinks } from "@/components/quotations/share-links";
 import { CompareSheet } from "@/components/quotations/compare-sheet";
+import { ReopenQuotationButton } from "@/components/quotations/reopen-quotation-button";
 import { sendQuotation, deleteQuotation } from "./actions";
 import { PageHeader } from "@/components/admin/page-header";
 
@@ -144,6 +145,9 @@ export default async function QuotationEditorPage({
                   Mark as sent
                 </Button>
               </form>
+            )}
+            {quotation.status === "closed" && (
+              <ReopenQuotationButton quotationId={id} />
             )}
             <form action={deleteQuotation}>
               <input type="hidden" name="id" value={id} />

@@ -500,10 +500,9 @@ export function ItemComparisonMatrix({
 
       {quotationStatus === "closed" ? (
         <p className="text-sm text-muted-foreground rounded-lg border border-dashed px-4 py-3">
-          Esta cotización ya está cerrada — las órdenes de compra se generaron
-          anteriormente. Para adjudicar de nuevo con notas, creá una cotización
-          nueva. El cierre ocurre solo al confirmar &quot;Generar purchase
-          orders&quot;, no antes.
+          Esta cotización está cerrada. Usá &quot;Reabrir cotización&quot; arriba
+          para editar notas y generar nuevas órdenes. Las POs existentes no se
+          modifican.
         </p>
       ) : (
         <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t">

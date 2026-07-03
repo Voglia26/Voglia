@@ -247,6 +247,34 @@ export async function sendQuotation(formData: FormData) {
   revalidatePath(`/admin/quotations/${id}`);
 }
 
+export async function reopenQuotation(
+  quotationId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!quotationId) return { ok: false, error: "ID inválido" };
+  const client = createAdminClient();
+
+  const { data: quotation } = await client
+    .from("quotations")
+    .select("status")
+    .eq("id", quotationId)
+    .maybeSingle();
+
+  if (!quotation) return { ok: false, error: "Cotización no encontrada" };
+  if (quotation.status !== "closed") {
+    return { ok: false, error: "Solo se pueden reabrir cotizaciones cerradas" };
+  }
+
+  const { error } = await client
+    .from("quotations")
+    .update({ status: "sent", closed_at: null })
+    .eq("id", quotationId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/admin/quotations/${quotationId}`);
+  return { ok: true };
+}
+
 export async function deleteQuotation(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;

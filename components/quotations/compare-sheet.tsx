@@ -6,6 +6,7 @@ import type { QuotationStatus } from "@/lib/types";
 import type { ItemCompareRow } from "@/lib/quotation-compare";
 import { fetchQuotationCompareData } from "@/app/admin/(dash)/quotations/[id]/compare-data";
 import { ItemComparisonMatrix } from "@/components/quotations/item-comparison-matrix";
+import { ReopenQuotationButton } from "@/components/quotations/reopen-quotation-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Loader2, XIcon } from "lucide-react";
@@ -128,9 +129,17 @@ export function CompareSheet({
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {status === "closed"
-                  ? "Solo lectura — esta cotización ya generó órdenes de compra."
+                  ? "Solo lectura — reabrí la cotización para editar notas y generar nuevas órdenes."
                   : "Elegí ganador, cantidad y notas por producto. La cotización se cierra al confirmar la generación de órdenes."}
               </p>
+              {status === "closed" && (
+                <ReopenQuotationButton
+                  quotationId={quotationId}
+                  size="sm"
+                  className="mt-3"
+                  onReopened={() => setStatus("sent")}
+                />
+              )}
               <Button
                 type="button"
                 variant="ghost"
