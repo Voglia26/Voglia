@@ -6,8 +6,15 @@ import type { QuotationStatus } from "@/lib/types";
 import type { ItemCompareRow } from "@/lib/quotation-compare";
 import { fetchQuotationCompareData } from "@/app/admin/(dash)/quotations/[id]/compare-data";
 import { ItemComparisonMatrix } from "@/components/quotations/item-comparison-matrix";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Loader2, XIcon } from "lucide-react";
+
+const STATUS_LABELS: Record<QuotationStatus, string> = {
+  draft: "Borrador",
+  sent: "Enviada",
+  closed: "Cerrada",
+};
 
 type FactoryCol = { id: string; name: string };
 
@@ -106,15 +113,23 @@ export function CompareSheet({
             }}
           >
             <header className="relative shrink-0 border-b px-6 py-4 pr-14">
-              <h2
-                id="compare-title"
-                className="font-heading text-xl font-medium leading-none"
-              >
-                Compare quotes
-              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  id="compare-title"
+                  className="font-heading text-xl font-medium leading-none"
+                >
+                  Compare quotes
+                </h2>
+                <Badge
+                  variant={status === "closed" ? "secondary" : "outline"}
+                >
+                  {STATUS_LABELS[status]}
+                </Badge>
+              </div>
               <p className="mt-2 text-sm text-muted-foreground">
-                Factory prices side by side. Pick a winner and quantity per
-                product.
+                {status === "closed"
+                  ? "Solo lectura — esta cotización ya generó órdenes de compra."
+                  : "Elegí ganador, cantidad y notas por producto. La cotización se cierra al confirmar la generación de órdenes."}
               </p>
               <Button
                 type="button"

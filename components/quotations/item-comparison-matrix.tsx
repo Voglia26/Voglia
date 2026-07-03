@@ -499,8 +499,11 @@ export function ItemComparisonMatrix({
       {err && <p className="text-sm text-destructive">{err}</p>}
 
       {quotationStatus === "closed" ? (
-        <p className="text-sm text-muted-foreground">
-          This quotation is already closed.
+        <p className="text-sm text-muted-foreground rounded-lg border border-dashed px-4 py-3">
+          Esta cotización ya está cerrada — las órdenes de compra se generaron
+          anteriormente. Para adjudicar de nuevo con notas, creá una cotización
+          nueva. El cierre ocurre solo al confirmar &quot;Generar purchase
+          orders&quot;, no antes.
         </p>
       ) : (
         <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t">
