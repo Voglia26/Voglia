@@ -13,6 +13,7 @@ import type {
 import { ArrowLeft } from "lucide-react";
 import { ComparisonTable } from "@/components/quotations/comparison-table";
 import { PageHeader } from "@/components/admin/page-header";
+import { isFactoryVisibleInCompare } from "@/lib/quotation-compare";
 
 export type CompareRow = {
   item: Item;
@@ -51,15 +52,17 @@ export default async function ComparePage({
     factory: Factory | Factory[];
     item_assignments: (ItemAssignment & { quotes: Quote | Quote[] | null })[];
   };
-  const qfs = ((qfRes.data ?? []) as unknown as QfShape[]).map((qf) => {
-    const factory = Array.isArray(qf.factory) ? qf.factory[0] : qf.factory;
-    return {
-      id: qf.id,
-      factory,
-      accepted_at: qf.accepted_at,
-      assignments: qf.item_assignments,
-    };
-  });
+  const qfs = ((qfRes.data ?? []) as unknown as QfShape[])
+    .map((qf) => {
+      const factory = Array.isArray(qf.factory) ? qf.factory[0] : qf.factory;
+      return {
+        id: qf.id,
+        factory,
+        accepted_at: qf.accepted_at,
+        assignments: qf.item_assignments,
+      };
+    })
+    .filter((qf) => isFactoryVisibleInCompare(qf.factory));
 
   const assignmentIds = qfs.flatMap((qf) => qf.assignments.map((a) => a.id));
   const { data: variantsData } =

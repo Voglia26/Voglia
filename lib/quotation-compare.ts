@@ -41,6 +41,18 @@ export type QuotationCompareData = {
   rows: ItemCompareRow[];
 };
 
+/** Factories hidden from Compare only (matrix, /compare, winner pick). DB/POs unchanged. */
+export const COMPARE_EXCLUDED_FACTORY_NAMES = ["Kevin"] as const;
+
+export function isFactoryVisibleInCompare(
+  factory: Pick<Factory, "name">
+): boolean {
+  const name = factory.name.trim().toLowerCase();
+  return !COMPARE_EXCLUDED_FACTORY_NAMES.some(
+    (excluded) => excluded.toLowerCase() === name
+  );
+}
+
 export async function loadQuotationCompareData(
   supabase: SupabaseClient,
   quotationId: string
@@ -69,10 +81,12 @@ export async function loadQuotationCompareData(
     item_assignments: (ItemAssignment & { quotes: Quote | Quote[] | null })[];
   };
 
-  const qfs = ((qfRes.data ?? []) as unknown as QfShape[]).map((qf) => ({
-    factory: Array.isArray(qf.factory) ? qf.factory[0] : qf.factory,
-    assignments: qf.item_assignments,
-  }));
+  const qfs = ((qfRes.data ?? []) as unknown as QfShape[])
+    .map((qf) => ({
+      factory: Array.isArray(qf.factory) ? qf.factory[0] : qf.factory,
+      assignments: qf.item_assignments,
+    }))
+    .filter((qf) => isFactoryVisibleInCompare(qf.factory));
 
   const factories = qfs.map((qf) => qf.factory).sort((a, b) => a.name.localeCompare(b.name));
 

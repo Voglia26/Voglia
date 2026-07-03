@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import type { QuotationStatus } from "@/lib/types";
 import { formatGramsLabel, itemRefCarats } from "@/lib/types";
 import type { ItemCompareRow, QuoteOption } from "@/lib/quotation-compare";
@@ -8,7 +8,6 @@ import { bestValidOption } from "@/lib/quotation-compare";
 import { ItemPhotos } from "@/components/items/item-photos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -158,8 +157,9 @@ export function ItemComparisonMatrix({
   const [awards, setAwards] = useState<Record<string, ItemAward>>(() =>
     initAwards(rows, factories)
   );
-  const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
+  const notesRefs = useRef(new Map<string, HTMLTextAreaElement>());
   const [submitting, startTransition] = useTransition();
+  const notesEditable = quotationStatus !== "closed";
   const [err, setErr] = useState<string | null>(null);
 
   const rowMinTotals = useMemo(() => {
@@ -231,7 +231,7 @@ export function ItemComparisonMatrix({
           variant_id: option.variantId,
           quote_id: award.quoteId,
           quantity: award.quantity,
-          notes: notesByItem[row.item.id]?.trim() || null,
+          notes: notesRefs.current.get(row.item.id)?.value.trim() || null,
         };
       })
       .filter((x): x is AwardInput => x !== null);
@@ -263,6 +263,12 @@ export function ItemComparisonMatrix({
 
   return (
     <div className="space-y-4">
+      {!notesEditable && (
+        <p className="text-sm text-amber-800 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-200 border border-amber-200 dark:border-amber-900 rounded-md px-3 py-2">
+          Esta cotización está cerrada — las notas no se pueden editar ni generar
+          nuevas órdenes de compra.
+        </p>
+      )}
       <div className="rounded-lg border">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
@@ -456,19 +462,27 @@ export function ItemComparisonMatrix({
                             >
                               Details / Notes
                             </label>
-                            <Textarea
+                            {notesEditable && (
+                              <p className="text-[10px] text-muted-foreground leading-snug">
+                                Opcional — no hace falta elegir fábrica antes.
+                              </p>
+                            )}
+                            <textarea
                               id={`compare-notes-${row.item.id}`}
+                              ref={(el) => {
+                                if (el) notesRefs.current.set(row.item.id, el);
+                                else notesRefs.current.delete(row.item.id);
+                              }}
                               rows={2}
-                              readOnly={quotationStatus === "closed"}
-                              className="min-h-[56px] text-xs text-foreground resize-y"
+                              readOnly={!notesEditable}
+                              defaultValue=""
+                              aria-label="Details and notes for factory"
+                              className={cn(
+                                "block min-h-[56px] w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-xs text-foreground shadow-xs outline-none",
+                                "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
+                                !notesEditable && "cursor-not-allowed opacity-60"
+                              )}
                               placeholder="e.g. 5× YG, 3× WG, size 7…"
-                              value={notesByItem[row.item.id] ?? ""}
-                              onChange={(e) =>
-                                setNotesByItem((prev) => ({
-                                  ...prev,
-                                  [row.item.id]: e.target.value,
-                                }))
-                              }
                             />
                           </div>
                         </div>

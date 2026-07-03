@@ -37,6 +37,7 @@ export function CompareSheet({
   const [rows, setRows] = useState(initialRows);
   const [factories, setFactories] = useState(initialFactories);
   const [hasQuotesState, setHasQuotesState] = useState(hasQuotes);
+  const [status, setStatus] = useState<QuotationStatus>(quotationStatus);
   const [loading, setLoading] = useState(false);
 
   const close = useCallback(() => setOpen(false), []);
@@ -54,6 +55,7 @@ export function CompareSheet({
           setRows(data.rows);
           setFactories(data.factories);
           setHasQuotesState(data.hasQuotes);
+          setStatus(data.quotationStatus);
         }
       })
       .finally(() => setLoading(false));
@@ -138,9 +140,9 @@ export function CompareSheet({
                 </p>
               ) : (
                 <ItemComparisonMatrix
-                  key={`compare-${quotationId}`}
+                  key={`compare-${quotationId}-${status}`}
                   quotationId={quotationId}
-                  quotationStatus={quotationStatus}
+                  quotationStatus={status}
                   rows={rows}
                   factories={factories}
                 />

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isFactoryVisibleInCompare } from "@/lib/quotation-compare";
 import { syncInventoryFromAwards } from "@/lib/inventory";
 import { createShipmentFromPurchaseOrder } from "@/lib/shipments";
 
@@ -40,6 +41,17 @@ export async function generatePurchaseOrders(
     byFactory.set(a.factory_id, list);
   }
   if (byFactory.size === 0) return { ok: false, error: "No valid awards" };
+
+  const factoryIds = [...byFactory.keys()];
+  const { data: factoryRows } = await supabase
+    .from("factories")
+    .select("id, name")
+    .in("id", factoryIds);
+  for (const f of factoryRows ?? []) {
+    if (!isFactoryVisibleInCompare(f)) {
+      return { ok: false, error: "Una fábrica seleccionada no está disponible en Compare" };
+    }
+  }
 
   const inventoryAwards: {
     item_id: string;
