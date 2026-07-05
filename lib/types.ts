@@ -67,6 +67,7 @@ export type Quotation = {
   status: QuotationStatus;
   created_at: string;
   closed_at: string | null;
+  opened_at: string;
 };
 
 export type Item = {

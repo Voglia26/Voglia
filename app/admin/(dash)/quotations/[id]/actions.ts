@@ -243,7 +243,10 @@ export async function sendQuotation(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const client = createAdminClient();
-  await client.from("quotations").update({ status: "sent" }).eq("id", id);
+  await client
+    .from("quotations")
+    .update({ status: "sent", opened_at: new Date().toISOString() })
+    .eq("id", id);
   revalidatePath(`/admin/quotations/${id}`);
 }
 
@@ -266,7 +269,11 @@ export async function reopenQuotation(
 
   const { error } = await client
     .from("quotations")
-    .update({ status: "sent", closed_at: null })
+    .update({
+      status: "sent",
+      closed_at: null,
+      opened_at: new Date().toISOString(),
+    })
     .eq("id", quotationId);
 
   if (error) return { ok: false, error: error.message };

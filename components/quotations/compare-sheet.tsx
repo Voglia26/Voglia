@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { QuotationStatus } from "@/lib/types";
 import type { ItemCompareRow } from "@/lib/quotation-compare";
+import type { RoundPurchaseOrder } from "@/app/admin/(dash)/quotations/[id]/compare/actions";
 import { fetchQuotationCompareData } from "@/app/admin/(dash)/quotations/[id]/compare-data";
 import { ItemComparisonMatrix } from "@/components/quotations/item-comparison-matrix";
 import { ReopenQuotationButton } from "@/components/quotations/reopen-quotation-button";
@@ -46,6 +47,9 @@ export function CompareSheet({
   const [factories, setFactories] = useState(initialFactories);
   const [hasQuotesState, setHasQuotesState] = useState(hasQuotes);
   const [status, setStatus] = useState<QuotationStatus>(quotationStatus);
+  const [roundPurchaseOrders, setRoundPurchaseOrders] = useState<
+    RoundPurchaseOrder[]
+  >([]);
   const [loading, setLoading] = useState(false);
 
   const close = useCallback(() => setOpen(false), []);
@@ -64,6 +68,7 @@ export function CompareSheet({
           setFactories(data.factories);
           setHasQuotesState(data.hasQuotes);
           setStatus(data.quotationStatus);
+          setRoundPurchaseOrders(data.roundPurchaseOrders);
         }
       })
       .finally(() => setLoading(false));
@@ -169,6 +174,8 @@ export function CompareSheet({
                   quotationStatus={status}
                   rows={rows}
                   factories={factories}
+                  initialRoundPurchaseOrders={roundPurchaseOrders}
+                  onQuotationClosed={() => setStatus("closed")}
                 />
               )}
             </div>
