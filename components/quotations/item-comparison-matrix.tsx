@@ -1,16 +1,20 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { QuotationStatus } from "@/lib/types";
 import { formatGramsLabel, itemRefCarats } from "@/lib/types";
 import type { ItemCompareRow, QuoteOption } from "@/lib/quotation-compare";
 import { bestValidOption } from "@/lib/quotation-compare";
 import { ItemPhotos } from "@/components/items/item-photos";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  generatePurchaseOrderForFactory,
+  fetchRoundPurchaseOrders,
+  syncPurchaseOrderItem,
   type AwardInput,
+  type RoundPoItem,
   type RoundPurchaseOrder,
 } from "@/app/admin/(dash)/quotations/[id]/compare/actions";
 import {
@@ -62,6 +66,27 @@ function initAwards(
     }
   }
   return initial;
+}
+
+function initNotesFromRoundPos(roundPos: RoundPurchaseOrder[]): Record<string, string> {
+  const notes: Record<string, string> = {};
+  for (const po of roundPos) {
+    for (const line of po.items) {
+      if (line.notes) notes[line.item_id] = line.notes;
+    }
+  }
+  return notes;
+}
+
+function findSavedItem(
+  roundPos: RoundPurchaseOrder[],
+  itemId: string
+): (RoundPoItem & { factory_id: string }) | null {
+  for (const po of roundPos) {
+    const line = po.items.find((i) => i.item_id === itemId);
+    if (line) return { ...line, factory_id: po.factory_id };
+  }
+  return null;
 }
 
 function optionGramsLabel(option: QuoteOption): string | null {
@@ -164,24 +189,16 @@ export function ItemComparisonMatrix({
   const [awards, setAwards] = useState<Record<string, ItemAward>>(() =>
     initAwards(rows, factories)
   );
-  const notesRefs = useRef(new Map<string, HTMLTextAreaElement>());
+  const [notesByItem, setNotesByItem] = useState<Record<string, string>>(() =>
+    initNotesFromRoundPos(initialRoundPurchaseOrders)
+  );
   const [roundPurchaseOrders, setRoundPurchaseOrders] = useState(
     initialRoundPurchaseOrders
   );
-  const [generatingFactoryId, setGeneratingFactoryId] = useState<string | null>(
-    null
-  );
+  const [generatingItemId, setGeneratingItemId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const notesEditable = quotationStatus !== "closed";
   const [err, setErr] = useState<string | null>(null);
-
-  const itemsInRound = useMemo(() => {
-    const ids = new Set<string>();
-    for (const po of roundPurchaseOrders) {
-      for (const itemId of po.item_ids) ids.add(itemId);
-    }
-    return ids;
-  }, [roundPurchaseOrders]);
 
   const rowMinTotals = useMemo(() => {
     const out: Record<string, number | null> = {};
@@ -237,61 +254,64 @@ export function ItemComparisonMatrix({
     }));
   }
 
+  function buildRowAward(row: ItemCompareRow): AwardInput | null {
+    const award = awards[row.item.id];
+    if (!award || award.quantity < 1) return null;
+    const options = row.byFactoryId[award.factoryId] ?? [];
+    const option = options.find((o) => o.quoteId === award.quoteId);
+    if (!option || option.declined || option.total <= 0) return null;
+    return {
+      item_id: row.item.id,
+      factory_id: award.factoryId,
+      variant_id: option.variantId,
+      quote_id: award.quoteId,
+      quantity: award.quantity,
+      notes: notesByItem[row.item.id]?.trim() || null,
+    };
+  }
+
   function buildAwardPayload(): AwardInput[] {
     return rows
-      .map((row) => {
-        const award = awards[row.item.id];
-        if (!award || award.quantity < 1) return null;
-        const options = row.byFactoryId[award.factoryId] ?? [];
-        const option = options.find((o) => o.quoteId === award.quoteId);
-        if (!option || option.declined || option.total <= 0) return null;
-        return {
-          item_id: row.item.id,
-          factory_id: award.factoryId,
-          variant_id: option.variantId,
-          quote_id: award.quoteId,
-          quantity: award.quantity,
-          notes: notesRefs.current.get(row.item.id)?.value.trim() || null,
-        };
-      })
+      .map((row) => buildRowAward(row))
       .filter((x): x is AwardInput => x !== null);
   }
 
-  function handleGenerateFactory(factoryId: string) {
-    setErr(null);
-    const allAwards = buildAwardPayload();
-    const factoryAwards = allAwards.filter((a) => a.factory_id === factoryId);
+  function isRowPoDirty(row: ItemCompareRow): boolean {
+    const current = buildRowAward(row);
+    if (!current) return false;
+    const saved = findSavedItem(roundPurchaseOrders, row.item.id);
+    if (!saved) return true;
+    return (
+      saved.factory_id !== current.factory_id ||
+      saved.quote_id !== current.quote_id ||
+      saved.quantity !== current.quantity ||
+      (saved.notes ?? "") !== (current.notes ?? "")
+    );
+  }
 
-    if (factoryAwards.length === 0) {
-      setErr("No hay productos adjudicados para esta fábrica.");
+  function handleSyncItem(row: ItemCompareRow) {
+    setErr(null);
+    const award = buildRowAward(row);
+    if (!award) {
+      setErr("Elige un ganador con cantidad ≥ 1.");
       return;
     }
 
-    setGeneratingFactoryId(factoryId);
+    const allAwards = buildAwardPayload();
+    setGeneratingItemId(row.item.id);
     startTransition(async () => {
-      const res = await generatePurchaseOrderForFactory(
-        quotationId,
-        factoryId,
-        factoryAwards,
-        allAwards
-      );
-      setGeneratingFactoryId(null);
+      const res = await syncPurchaseOrderItem(quotationId, award, allAwards);
+      setGeneratingItemId(null);
       if (!res.ok) {
         setErr(res.error);
         return;
       }
-      setRoundPurchaseOrders((prev) => [
+      const updated = await fetchRoundPurchaseOrders(quotationId);
+      setRoundPurchaseOrders(updated);
+      setNotesByItem((prev) => ({
         ...prev,
-        {
-          id: res.po.id,
-          factory_id: res.po.factory_id,
-          token: res.po.token,
-          item_ids: factoryAwards
-            .filter((a) => !itemsInRound.has(a.item_id))
-            .map((a) => a.item_id),
-          created_at: new Date().toISOString(),
-        },
-      ]);
+        [row.item.id]: res.item.notes ?? "",
+      }));
       if (res.quotationClosed) onQuotationClosed?.();
     });
   }
@@ -315,9 +335,16 @@ export function ItemComparisonMatrix({
       const awardedItemIds = allAwards
         .filter((a) => a.factoryId === factoryId)
         .map((a) => a.itemId);
-      const pendingItemIds = awardedItemIds.filter(
-        (id) => !itemsInRound.has(id)
-      );
+      const savedItemIds = new Set<string>();
+      for (const po of roundPurchaseOrders) {
+        if (po.factory_id !== factoryId) continue;
+        for (const line of po.items) savedItemIds.add(line.item_id);
+      }
+      const pendingItemIds = awardedItemIds.filter((id) => {
+        const row = rows.find((r) => r.item.id === id);
+        if (!row) return false;
+        return isRowPoDirty(row);
+      });
       const roundPos = roundPurchaseOrders.filter(
         (po) => po.factory_id === factoryId
       );
@@ -329,7 +356,7 @@ export function ItemComparisonMatrix({
         roundPos,
       };
     });
-  }, [awards, rows, factories, itemsInRound, roundPurchaseOrders]);
+  }, [awards, rows, factories, roundPurchaseOrders, notesByItem]);
 
   const awardsCount = Object.values(awards).filter((a) => a.quantity >= 1).length;
 
@@ -463,7 +490,6 @@ export function ItemComparisonMatrix({
                           <select
                             className={selectClass}
                             value={award?.factoryId ?? ""}
-                            disabled={itemsInRound.has(row.item.id)}
                             onChange={(e) => {
                               const id = e.target.value;
                               if (!id) {
@@ -495,7 +521,6 @@ export function ItemComparisonMatrix({
                             <select
                               className={cn(selectClass, "text-xs h-8")}
                               value={award.quoteId}
-                              disabled={itemsInRound.has(row.item.id)}
                               onChange={(e) =>
                                 setFactoryWinner(
                                   row,
@@ -520,9 +545,7 @@ export function ItemComparisonMatrix({
                               type="number"
                               min={1}
                               className="h-8 w-16 text-right tabular-nums"
-                              disabled={
-                                !award || itemsInRound.has(row.item.id)
-                              }
+                              disabled={!award}
                               value={award?.quantity ?? ""}
                               onChange={(e) => {
                                 const q = Math.max(
@@ -555,15 +578,15 @@ export function ItemComparisonMatrix({
                             )}
                             <textarea
                               id={`compare-notes-${row.item.id}`}
-                              ref={(el) => {
-                                if (el) notesRefs.current.set(row.item.id, el);
-                                else notesRefs.current.delete(row.item.id);
-                              }}
                               rows={2}
-                              readOnly={
-                                !notesEditable || itemsInRound.has(row.item.id)
+                              readOnly={!notesEditable}
+                              value={notesByItem[row.item.id] ?? ""}
+                              onChange={(e) =>
+                                setNotesByItem((prev) => ({
+                                  ...prev,
+                                  [row.item.id]: e.target.value,
+                                }))
                               }
-                              defaultValue=""
                               aria-label="Details and notes for factory"
                               className={cn(
                                 "block min-h-[56px] w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-xs text-foreground shadow-xs outline-none",
@@ -572,11 +595,31 @@ export function ItemComparisonMatrix({
                               )}
                               placeholder="e.g. 5× YG, 3× WG, size 7…"
                             />
-                            {itemsInRound.has(row.item.id) && (
-                              <p className="text-[10px] text-muted-foreground">
-                                Incluido en PO de esta ronda
-                              </p>
+                            {notesEditable && award && isRowPoDirty(row) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="w-full"
+                                disabled={generatingItemId === row.item.id}
+                                onClick={() => handleSyncItem(row)}
+                              >
+                                {generatingItemId === row.item.id && (
+                                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                )}
+                                {findSavedItem(roundPurchaseOrders, row.item.id)
+                                  ? "Actualizar PO"
+                                  : "Generate PO"}
+                              </Button>
                             )}
+                            {notesEditable &&
+                              award &&
+                              !isRowPoDirty(row) &&
+                              findSavedItem(roundPurchaseOrders, row.item.id) && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  PO al día para esta ronda
+                                </p>
+                              )}
                           </div>
                         </div>
                       )}
@@ -593,21 +636,19 @@ export function ItemComparisonMatrix({
 
       {quotationStatus === "closed" ? (
         <p className="text-sm text-muted-foreground rounded-lg border border-dashed px-4 py-3">
-          Esta cotización está cerrada. Usá &quot;Reabrir cotización&quot; arriba
+          Esta cotización está cerrada. Usa &quot;Reabrir cotización&quot; arriba
           para editar notas y generar nuevas órdenes. Las POs existentes no se
           modifican.
         </p>
-      ) : awardsCount > 0 ? (
-        <FactoryPoActions
-          summaries={factorySummaries}
-          generatingFactoryId={generatingFactoryId}
-          quotationOpen={notesEditable}
-          onGenerate={handleGenerateFactory}
-        />
       ) : (
-        <p className="text-sm text-muted-foreground pt-2 border-t">
-          Elegí al menos un ganador por producto para generar POs por fábrica.
-        </p>
+        <>
+          {awardsCount === 0 && (
+            <p className="text-sm text-muted-foreground pt-2 border-t">
+              Elige al menos un ganador por producto para generar POs por fábrica.
+            </p>
+          )}
+          <FactoryPoActions summaries={factorySummaries} />
+        </>
       )}
     </div>
   );

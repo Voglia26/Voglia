@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ItemPhotos } from "@/components/items/item-photos";
 import type { QuotationStatus } from "@/lib/types";
 import {
@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import {
   fetchRoundPurchaseOrders,
-  generatePurchaseOrderForFactory,
   type AwardInput,
   type RoundPurchaseOrder,
 } from "@/app/admin/(dash)/quotations/[id]/compare/actions";
@@ -61,25 +60,22 @@ export function ComparisonTable({
   const [roundPurchaseOrders, setRoundPurchaseOrders] = useState<
     RoundPurchaseOrder[]
   >([]);
-  const [generatingFactoryId, setGeneratingFactoryId] = useState<string | null>(
-    null
-  );
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchRoundPurchaseOrders(quotationId).then(setRoundPurchaseOrders);
+    fetchRoundPurchaseOrders(quotationId).then((pos) => {
+      setRoundPurchaseOrders(pos);
+      const notes: Record<string, string> = {};
+      for (const po of pos) {
+        for (const line of po.items) {
+          if (line.notes) notes[line.item_id] = line.notes;
+        }
+      }
+      setNotesByItem(notes);
+    });
   }, [quotationId]);
-
-  const itemsInRound = useMemo(() => {
-    const ids = new Set<string>();
-    for (const po of roundPurchaseOrders) {
-      for (const itemId of po.item_ids) ids.add(itemId);
-    }
-    return ids;
-  }, [roundPurchaseOrders]);
 
   const tableRows = useMemo(() => {
     const base = rows.map((row) => ({
@@ -127,43 +123,6 @@ export function ComparisonTable({
       .filter((x): x is AwardInput => x !== null);
   }
 
-  function handleGenerateFactory(factoryId: string) {
-    setErr(null);
-    const allAwards = buildAwardPayload();
-    const factoryAwards = allAwards.filter((a) => a.factory_id === factoryId);
-    if (factoryAwards.length === 0) {
-      setErr("No hay productos adjudicados para esta fábrica.");
-      return;
-    }
-
-    setGeneratingFactoryId(factoryId);
-    startTransition(async () => {
-      const res = await generatePurchaseOrderForFactory(
-        quotationId,
-        factoryId,
-        factoryAwards,
-        allAwards
-      );
-      setGeneratingFactoryId(null);
-      if (!res.ok) {
-        setErr(res.error);
-        return;
-      }
-      setRoundPurchaseOrders((prev) => [
-        ...prev,
-        {
-          id: res.po.id,
-          factory_id: res.po.factory_id,
-          token: res.po.token,
-          item_ids: factoryAwards
-            .filter((a) => !itemsInRound.has(a.item_id))
-            .map((a) => a.item_id),
-          created_at: new Date().toISOString(),
-        },
-      ]);
-    });
-  }
-
   const factorySummaries = useMemo((): FactoryAwardSummary[] => {
     const allAwards = buildAwardPayload();
     const factoryIds = [...new Set(allAwards.map((a) => a.factory_id))];
@@ -171,9 +130,6 @@ export function ComparisonTable({
       const awardedItemIds = allAwards
         .filter((a) => a.factory_id === factoryId)
         .map((a) => a.item_id);
-      const pendingItemIds = awardedItemIds.filter(
-        (id) => !itemsInRound.has(id)
-      );
       const roundPos = roundPurchaseOrders.filter(
         (po) => po.factory_id === factoryId
       );
@@ -183,11 +139,11 @@ export function ComparisonTable({
         factoryId,
         factoryName,
         awardedItemIds,
-        pendingItemIds,
+        pendingItemIds: [],
         roundPos,
       };
     });
-  }, [awards, notesByItem, tableRows, itemsInRound, roundPurchaseOrders, rows]);
+  }, [awards, notesByItem, tableRows, roundPurchaseOrders, rows]);
 
   const awardsCount = Object.values(awards).filter((q) => q >= 1).length;
 
@@ -377,10 +333,7 @@ export function ComparisonTable({
                           rows={2}
                           className="text-xs min-h-[56px] resize-y bg-background text-foreground"
                           placeholder="e.g. 5× YG, 3× WG, size 7…"
-                          disabled={
-                            quotationStatus === "closed" ||
-                            itemsInRound.has(row.item.id)
-                          }
+                          disabled={quotationStatus === "closed"}
                           value={notesByItem[row.item.id] ?? ""}
                           onChange={(e) =>
                             setNotesByItem((prev) => ({
@@ -406,17 +359,15 @@ export function ComparisonTable({
           This quotation is already closed and purchase orders have been
           generated.
         </p>
-      ) : awardsCount > 0 ? (
-        <FactoryPoActions
-          summaries={factorySummaries}
-          generatingFactoryId={generatingFactoryId}
-          quotationOpen
-          onGenerate={handleGenerateFactory}
-        />
       ) : (
-        <p className="text-sm text-muted-foreground">
-          Select at least one winner with quantity ≥ 1.
-        </p>
+        <>
+          {awardsCount === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Select at least one winner with quantity ≥ 1.
+            </p>
+          )}
+          <FactoryPoActions summaries={factorySummaries} />
+        </>
       )}
     </div>
   );

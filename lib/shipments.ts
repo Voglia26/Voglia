@@ -87,6 +87,80 @@ export async function createShipmentFromPurchaseOrder(
   return { ok: true, id: shipment.id };
 }
 
+export async function getOrCreateShipmentForPurchaseOrder(
+  supabase: SupabaseClient,
+  purchaseOrderId: string,
+  factoryId: string,
+  orderDateIso: string
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const { data: existing } = await supabase
+    .from("shipments")
+    .select("id")
+    .eq("purchase_order_id", purchaseOrderId)
+    .maybeSingle();
+
+  if (existing) return { ok: true, id: existing.id };
+
+  return createShipmentFromPurchaseOrder(
+    supabase,
+    purchaseOrderId,
+    factoryId,
+    orderDateIso
+  );
+}
+
+export async function syncShipmentItemForPoLine(
+  supabase: SupabaseClient,
+  shipmentId: string,
+  purchaseOrderItemId: string,
+  item: Pick<Item, "id" | "name" | "sku" | "photo_urls">,
+  quantity: number,
+  notes: string | null,
+  position: number
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const payload = {
+    name: item.name ?? null,
+    sku: resolveItemSku(item),
+    photo_url: item.photo_urls?.[0] ?? null,
+    quantity,
+    notes: notes?.trim() || null,
+    position,
+  };
+
+  const { data: existing } = await supabase
+    .from("shipment_items")
+    .select("id")
+    .eq("purchase_order_item_id", purchaseOrderItemId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("shipment_items")
+      .update(payload)
+      .eq("id", existing.id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }
+
+  const { error } = await supabase.from("shipment_items").insert({
+    shipment_id: shipmentId,
+    purchase_order_item_id: purchaseOrderItemId,
+    ...payload,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deleteShipmentItemForPoLine(
+  supabase: SupabaseClient,
+  purchaseOrderItemId: string
+): Promise<void> {
+  await supabase
+    .from("shipment_items")
+    .delete()
+    .eq("purchase_order_item_id", purchaseOrderItemId);
+}
+
 export async function loadShipmentById(id: string): Promise<ShipmentView | null> {
   const supabase = createAdminClient();
   const { data } = await supabase

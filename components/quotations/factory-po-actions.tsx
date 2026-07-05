@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { RoundPurchaseOrder } from "@/app/admin/(dash)/quotations/[id]/compare/actions";
 import { Button } from "@/components/ui/button";
-import { Check, Copy, ExternalLink, Loader2 } from "lucide-react";
+import { Check, Copy, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function PoCopyLink({ token }: { token: string }) {
@@ -53,88 +53,38 @@ export type FactoryAwardSummary = {
 
 export function FactoryPoActions({
   summaries,
-  generatingFactoryId,
-  quotationOpen,
-  onGenerate,
 }: {
   summaries: FactoryAwardSummary[];
-  generatingFactoryId: string | null;
-  quotationOpen: boolean;
-  onGenerate: (factoryId: string) => void;
 }) {
-  if (summaries.length === 0) return null;
+  const withPos = summaries.filter((s) => s.roundPos.length > 0);
+  if (withPos.length === 0) return null;
 
   return (
     <div className="space-y-3 pt-2 border-t">
       <div>
-        <h3 className="text-sm font-medium">Purchase orders por fábrica</h3>
+        <h3 className="text-sm font-medium">Links de purchase orders</h3>
         <p className="text-xs text-muted-foreground mt-1">
-          Generá y enviá una PO a la vez. La cotización se cierra cuando todos
-          los productos adjudicados tienen PO en esta ronda.
+          Comparte el link con cada fábrica. Si actualizas un producto, el mismo
+          link refleja los cambios.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {summaries.map((s) => {
-          const isGenerating = generatingFactoryId === s.factoryId;
-          const hasPending = s.pendingItemIds.length > 0;
+        {withPos.map((s) => {
           const latestPo = s.roundPos[s.roundPos.length - 1];
-
           return (
             <div
               key={s.factoryId}
-              className={cn(
-                "rounded-lg border p-4 space-y-3",
-                !hasPending && s.roundPos.length > 0 && "bg-muted/30"
-              )}
+              className={cn("rounded-lg border p-4 space-y-3 bg-muted/30")}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium">{s.factoryName}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {s.awardedItemIds.length} producto
-                    {s.awardedItemIds.length !== 1 ? "s" : ""} adjudicado
-                    {s.awardedItemIds.length !== 1 ? "s" : ""}
-                    {hasPending
-                      ? ` · ${s.pendingItemIds.length} pendiente${s.pendingItemIds.length !== 1 ? "s" : ""}`
-                      : " · PO generada"}
-                  </p>
-                </div>
-                {quotationOpen && hasPending && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={isGenerating || !!generatingFactoryId}
-                    onClick={() => onGenerate(s.factoryId)}
-                  >
-                    {isGenerating && (
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    )}
-                    Generate PO
-                  </Button>
-                )}
-              </div>
-
-              {s.roundPos.length > 0 && (
-                <div className="space-y-2">
-                  {s.roundPos.map((po, idx) => (
-                    <div key={po.id} className="space-y-1.5">
-                      {s.roundPos.length > 1 && (
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          PO {idx + 1} · {po.item_ids.length} ítem
-                          {po.item_ids.length !== 1 ? "s" : ""}
-                        </p>
-                      )}
-                      <PoCopyLink token={po.token} />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!hasPending && !latestPo && quotationOpen && (
-                <p className="text-xs text-muted-foreground">
-                  Sin productos adjudicados para esta fábrica.
+              <div>
+                <p className="font-medium">{s.factoryName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {s.awardedItemIds.length} producto
+                  {s.awardedItemIds.length !== 1 ? "s" : ""} adjudicado
+                  {s.awardedItemIds.length !== 1 ? "s" : ""}
                 </p>
-              )}
+              </div>
+              <PoCopyLink token={latestPo.token} />
             </div>
           );
         })}

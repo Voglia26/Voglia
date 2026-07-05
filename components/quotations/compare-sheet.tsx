@@ -134,8 +134,8 @@ export function CompareSheet({
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {status === "closed"
-                  ? "Solo lectura — reabrí la cotización para editar notas y generar nuevas órdenes."
-                  : "Elegí ganador, cantidad y notas por producto. La cotización se cierra al confirmar la generación de órdenes."}
+                  ? "Solo lectura — reabre la cotización para editar notas y generar nuevas órdenes."
+                  : "Elige el ganador, la cantidad y las notas por producto. La cotización se cierra cuando todos los productos adjudicados tienen PO en esta ronda."}
               </p>
               {status === "closed" && (
                 <ReopenQuotationButton
