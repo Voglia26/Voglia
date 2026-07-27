@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isFactoryVisibleInCompare } from "@/lib/quotation-compare";
 import { syncInventoryFromAwards } from "@/lib/inventory";
 import {
   createShipmentFromPurchaseOrder,
@@ -278,8 +277,8 @@ export async function syncPurchaseOrderItem(
     .eq("id", award.factory_id)
     .maybeSingle();
 
-  if (!factory || !isFactoryVisibleInCompare(factory)) {
-    return { ok: false, error: "Fábrica no disponible en Compare" };
+  if (!factory) {
+    return { ok: false, error: "Fábrica no encontrada" };
   }
 
   await removeItemFromRoundPurchaseOrders(
