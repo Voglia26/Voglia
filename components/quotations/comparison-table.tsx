@@ -149,18 +149,18 @@ export function ComparisonTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="overflow-auto">
+      <div className="rounded-xl border bg-card shadow-sm">
+        <div className="max-h-[min(70vh,calc(100vh-14rem))] overflow-auto">
           <table className="w-full text-sm border-separate border-spacing-0">
             <thead>
               <tr>
-                <th className="text-left px-4 py-3 eyebrow text-[10px] sticky left-0 bg-muted/60 z-20 min-w-[220px] border-b">
+                <th className="text-left px-4 py-3 eyebrow text-[10px] sticky top-0 left-0 bg-muted z-30 min-w-[220px] border-b">
                   Item
                 </th>
-                <th className="text-left px-3 py-3 eyebrow text-[10px] min-w-[120px] bg-muted/60 border-b">
+                <th className="text-left px-3 py-3 eyebrow text-[10px] sticky top-0 z-20 min-w-[120px] bg-muted border-b">
                   Factory
                 </th>
-                <th className="text-left px-3 py-3 eyebrow text-[10px] min-w-[180px] bg-muted/60 border-b">
+                <th className="text-left px-3 py-3 eyebrow text-[10px] sticky top-0 z-20 min-w-[180px] bg-muted border-b">
                   Option
                 </th>
                 <SortableHeader
@@ -180,10 +180,10 @@ export function ComparisonTable({
                     align="right"
                   />
                 ))}
-                <th className="px-3 py-3 eyebrow text-[10px] text-right min-w-[90px] bg-muted/60 border-b">
+                <th className="px-3 py-3 eyebrow text-[10px] text-right sticky top-0 z-20 min-w-[90px] bg-muted border-b">
                   Qty
                 </th>
-                <th className="px-3 py-3 eyebrow text-[10px] min-w-[180px] bg-muted/60 border-b">
+                <th className="px-3 py-3 eyebrow text-[10px] sticky top-0 z-20 min-w-[180px] bg-muted border-b">
                   Details / Notes
                 </th>
               </tr>
@@ -389,7 +389,7 @@ function SortableHeader({
 }) {
   return (
     <th
-      className={`px-3 py-3 min-w-[100px] bg-muted/60 border-b text-${align}`}
+      className={`sticky top-0 z-20 px-3 py-3 min-w-[100px] bg-muted border-b text-${align}`}
     >
       <button
         type="button"

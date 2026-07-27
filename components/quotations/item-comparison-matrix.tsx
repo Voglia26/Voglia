@@ -379,17 +379,16 @@ export function ItemComparisonMatrix({
         </p>
       )}
       <div className="rounded-lg border">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-separate border-spacing-0">
             <thead>
-              <tr className="bg-muted/50 border-b">
-                <th className="text-left font-medium px-4 py-3 min-w-[200px] w-[28%]">
+              <tr>
+                <th className="sticky top-0 z-20 text-left font-medium px-4 py-3 min-w-[200px] w-[28%] bg-muted border-b">
                   Product
                 </th>
                 {factories.map((f) => (
                   <th
                     key={f.id}
-                    className="text-right font-medium px-3 py-3"
+                    className="sticky top-0 z-20 text-right font-medium px-3 py-3 bg-muted border-b"
                     style={{ minWidth: factoryColWidth }}
                   >
                     <div>{f.name}</div>
@@ -398,7 +397,7 @@ export function ItemComparisonMatrix({
                     </div>
                   </th>
                 ))}
-                <th className="text-left font-medium px-4 py-3 min-w-[280px] w-[28%] border-l bg-muted/50">
+                <th className="sticky top-0 z-20 text-left font-medium px-4 py-3 min-w-[280px] w-[28%] border-l border-b bg-muted">
                   Winner · Details
                 </th>
               </tr>
@@ -630,7 +629,6 @@ export function ItemComparisonMatrix({
               })}
             </tbody>
           </table>
-        </div>
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}
