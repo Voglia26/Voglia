@@ -429,6 +429,7 @@ export function ItemComparisonMatrix({
                           urls={row.item.photo_urls}
                           size="sm"
                           limit={1}
+                          zoomable
                         />
                         <div className="min-w-0">
                           <span className="font-medium leading-snug block">

@@ -217,6 +217,7 @@ export function ComparisonTable({
                             urls={row.item.photo_urls}
                             size="sm"
                             limit={1}
+                            zoomable
                           />
                         ) : (
                           <div className="w-10 shrink-0" />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, ImageIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,11 @@ export function ItemPhotos({
 }) {
   const { box, icon } = SIZES[size];
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Zoomable: one main thumbnail; full set opens in lightbox carousel
   const thumbUrls = zoomable
@@ -54,16 +60,21 @@ export function ItemPhotos({
     if (lightboxIndex === null) return;
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") closeLightbox();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeLightbox();
+        return;
+      }
       if (e.key === "ArrowLeft") goPrev();
       if (e.key === "ArrowRight") goNext();
     }
 
     document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.body.style.overflow = "";
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keydown", onKeyDown, true);
     };
   }, [lightboxIndex, closeLightbox, goPrev, goNext]);
 
@@ -158,64 +169,67 @@ export function ItemPhotos({
     <>
       {thumbs}
 
-      {lightboxIndex !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Photo preview"
-          onClick={closeLightbox}
-        >
-          <button
-            type="button"
+      {mounted &&
+        lightboxIndex !== null &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Photo preview"
             onClick={closeLightbox}
-            className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
-            aria-label="Close"
           >
-            <X className="h-5 w-5" />
-          </button>
+            <button
+              type="button"
+              onClick={closeLightbox}
+              className="absolute top-4 right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
 
-          {urls.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goPrev();
-                }}
-                className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
-                aria-label="Previous photo"
-              >
-                <ChevronLeft className="h-6 w-6" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goNext();
-                }}
-                className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
-                aria-label="Next photo"
-              >
-                <ChevronRight className="h-6 w-6" />
-              </button>
-              <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/70 tabular-nums">
-                {lightboxIndex + 1} / {urls.length}
-              </p>
-            </>
-          )}
+            {urls.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goPrev();
+                  }}
+                  className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+                  aria-label="Previous photo"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goNext();
+                  }}
+                  className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+                  aria-label="Next photo"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+                <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/70 tabular-nums">
+                  {lightboxIndex + 1} / {urls.length}
+                </p>
+              </>
+            )}
 
-          <Image
-            src={urls[lightboxIndex]}
-            alt=""
-            width={1200}
-            height={1200}
-            className="max-h-[90vh] max-w-[90vw] w-auto h-auto object-contain"
-            unoptimized
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+            <Image
+              src={urls[lightboxIndex]}
+              alt=""
+              width={1200}
+              height={1200}
+              className="max-h-[90vh] max-w-[90vw] w-auto h-auto object-contain"
+              unoptimized
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>,
+          document.body
+        )}
     </>
   );
 }
