@@ -3,12 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAuthenticated } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
 
 export async function createQuotationFromInventory(
   inventoryProductId: string
 ): Promise<{ ok: false; error: string } | never> {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return { ok: false, error: "Unauthorized" };
   }
 

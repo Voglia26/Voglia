@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAuthenticated } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
 import type { ItemSpecs } from "@/lib/types";
 import type { VariantDraft } from "@/components/quotations/variants-field";
 
@@ -24,7 +24,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export async function uploadItemPhoto(
   formData: FormData
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return { ok: false, error: "Unauthorized" };
   }
   const file = formData.get("file");

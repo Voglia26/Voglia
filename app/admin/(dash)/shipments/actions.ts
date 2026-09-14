@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAuthenticated } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
 import { parseCsvShipmentItems } from "@/lib/shipments";
 import {
   SHIPMENT_STATUS_FLOW,
@@ -132,7 +132,7 @@ async function insertShipmentWithItems(input: {
 export async function createManualShipment(
   formData: FormData
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return { ok: false, error: "Unauthorized" };
   }
 
@@ -199,7 +199,7 @@ export async function createManualShipment(
 export async function setShipmentStatus(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return { ok: false, error: "Unauthorized" };
   }
 
@@ -237,7 +237,7 @@ export async function setShipmentStatus(
 export async function setShipmentExpectedDate(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return { ok: false, error: "Unauthorized" };
   }
 
@@ -262,7 +262,7 @@ export async function setShipmentExpectedDate(
 export async function uploadShipmentItemPhoto(
   formData: FormData
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  if (!(await isAuthenticated())) {
+  if (!(await isAdmin())) {
     return { ok: false, error: "Unauthorized" };
   }
   const file = formData.get("file");

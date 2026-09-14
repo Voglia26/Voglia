@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { isAuthenticated, signOut } from "@/lib/auth";
+import { isAdmin, signOut } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { AdminShell } from "@/components/admin/admin-shell";
 
@@ -8,12 +8,12 @@ export default async function DashLayout({
 }: {
   children: React.ReactNode;
 }) {
-  if (!(await isAuthenticated())) redirect("/admin/login");
+  if (!(await isAdmin())) redirect("/login");
 
   async function logout() {
     "use server";
     await signOut();
-    redirect("/admin/login");
+    redirect("/login");
   }
 
   return (

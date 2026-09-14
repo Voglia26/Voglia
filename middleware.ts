@@ -1,20 +1,38 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { COOKIE_NAME } from "@/lib/auth";
+import {
+  SESSION_COOKIE_NAME,
+  decodeSessionCookie,
+} from "@/lib/session-cookie";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (!pathname.startsWith("/admin")) return NextResponse.next();
-  if (pathname === "/admin/login") return NextResponse.next();
 
-  const expected = process.env.ADMIN_PASSWORD;
-  const cookie = request.cookies.get(COOKIE_NAME)?.value;
-  if (expected && cookie === expected) return NextResponse.next();
+  if (pathname === "/login" || pathname === "/admin/login") {
+    return NextResponse.next();
+  }
 
-  const loginUrl = new URL("/admin/login", request.url);
-  loginUrl.searchParams.set("from", pathname);
-  return NextResponse.redirect(loginUrl);
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const session = await decodeSessionCookie(token);
+
+  if (pathname.startsWith("/admin")) {
+    if (session?.role === "admin") return NextResponse.next();
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (pathname.startsWith("/seller")) {
+    if (session?.role === "seller" || session?.role === "admin") {
+      return NextResponse.next();
+    }
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/seller/:path*", "/login"],
 };

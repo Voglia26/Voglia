@@ -1,4 +1,17 @@
 export type QuotationStatus = "draft" | "sent" | "closed";
+
+export type AppUserRole = "admin" | "seller";
+
+export type AppUser = {
+  id: string;
+  username: string;
+  password_hash: string;
+  display_name: string;
+  role: AppUserRole;
+  active: boolean;
+  created_at: string;
+};
+
 export type PurchaseOrderStatus =
   | "pending"
   | "approved"
