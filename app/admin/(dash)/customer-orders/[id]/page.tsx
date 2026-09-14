@@ -5,12 +5,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { CustomerOrder } from "@/lib/types";
 import {
   CUSTOMER_ORDER_STATUS_LABELS,
+  canGenerateCustomerPurchaseOrder,
   customerOrderLeadDays,
   isCustomerOrderCancelled,
   isCustomerOrderLocked,
 } from "@/lib/types";
 import { PageHeader } from "@/components/admin/page-header";
 import { CancelCustomerOrderButton } from "@/components/customer-orders/cancel-button";
+import { GenerateCpoButton } from "@/components/customer-orders/generate-cpo-button";
+import { CopyCpoLink } from "@/components/customer-orders/copy-cpo-link";
 import {
   CustomerOrderStatusBadge,
   RestockBadge,
@@ -29,7 +32,7 @@ export default async function AdminCustomerOrderDetailPage({
   const { data } = await supabase
     .from("customer_orders")
     .select(
-      "*, factory:factories(id, name), seller:app_users(id, display_name, username)"
+      "*, factory:factories(id, name), seller:app_users(id, display_name, username), cpo:customer_purchase_orders(id, token)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -42,6 +45,10 @@ export default async function AdminCustomerOrderDetailPage({
       | { id: string; display_name: string; username: string }
       | { id: string; display_name: string; username: string }[]
       | null;
+    cpo:
+      | { id: string; token: string }
+      | { id: string; token: string }[]
+      | null;
   };
 
   const row = data as unknown as Row;
@@ -50,9 +57,11 @@ export default async function AdminCustomerOrderDetailPage({
     ? row.factory[0] ?? null
     : row.factory;
   const seller = Array.isArray(row.seller) ? row.seller[0] ?? null : row.seller;
+  const cpo = Array.isArray(row.cpo) ? row.cpo[0] ?? null : row.cpo;
   const lead = customerOrderLeadDays(order.ordered_at, order.delivered_at);
   const locked = isCustomerOrderLocked(order);
   const cancelled = isCustomerOrderCancelled(order);
+  const canGenerate = canGenerateCustomerPurchaseOrder(order);
 
   const fields: { label: string; value: string }[] = [
     { label: "Vendedora", value: seller?.display_name ?? "—" },
@@ -168,13 +177,35 @@ export default async function AdminCustomerOrderDetailPage({
           ))}
         </dl>
 
-        <p className="text-sm text-muted-foreground border-t pt-4">
-          {cancelled
-            ? "No se generará Purchase Order para un pedido cancelado."
-            : locked
-              ? "Ya tiene Purchase Order asociada (etapa 3)."
-              : "Generación de link de Purchase Order — próxima etapa."}
-        </p>
+        {!cancelled && (
+          <div className="border-t pt-4 space-y-3">
+            {canGenerate ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Genera el link único para enviar a{" "}
+                  {factory?.name ?? "el proveedor"}.
+                </p>
+                <GenerateCpoButton
+                  orderId={order.id}
+                  isRestock={order.is_restock}
+                  size="default"
+                />
+              </div>
+            ) : cpo?.token ? (
+              <CopyCpoLink token={cpo.token} isRestock={order.is_restock} />
+            ) : locked ? (
+              <p className="text-sm text-muted-foreground">
+                Purchase Order asociada, pero no se encontró el token.
+              </p>
+            ) : null}
+          </div>
+        )}
+
+        {cancelled && (
+          <p className="text-sm text-muted-foreground border-t pt-4">
+            No se generará Purchase Order para un pedido cancelado.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -92,6 +92,29 @@ export function isCustomerOrderCancelled(
   return order.status === "cancelled";
 }
 
+export function canGenerateCustomerPurchaseOrder(
+  order: Pick<
+    CustomerOrder,
+    "factory_id" | "customer_purchase_order_id" | "status"
+  >
+): boolean {
+  return (
+    !!order.factory_id &&
+    !order.customer_purchase_order_id &&
+    order.status !== "cancelled"
+  );
+}
+
+export type CustomerPurchaseOrder = {
+  id: string;
+  customer_order_id: string;
+  factory_id: string;
+  token: string;
+  quantity: number;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type PurchaseOrderStatus =
   | "pending"
   | "approved"

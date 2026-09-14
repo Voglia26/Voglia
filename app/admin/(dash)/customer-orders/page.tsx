@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { CustomerOrder } from "@/lib/types";
 import { PageHeader } from "@/components/admin/page-header";
-import { CustomerOrderCard } from "@/components/customer-orders/order-badges";
+import { AdminCustomerOrderRow } from "@/components/customer-orders/order-badges";
 import { CustomerOrderFilters } from "@/components/customer-orders/admin-filters";
 
 export default async function AdminCustomerOrdersPage({
@@ -24,7 +24,7 @@ export default async function AdminCustomerOrdersPage({
   let query = supabase
     .from("customer_orders")
     .select(
-      "*, factory:factories(id, name), seller:app_users(id, display_name)"
+      "*, factory:factories(id, name), seller:app_users(id, display_name), cpo:customer_purchase_orders(id, token)"
     )
     .order("ordered_at", { ascending: false })
     .order("created_at", { ascending: false });
@@ -56,12 +56,17 @@ export default async function AdminCustomerOrdersPage({
       | { id: string; display_name: string }
       | { id: string; display_name: string }[]
       | null;
+    cpo:
+      | { id: string; token: string }
+      | { id: string; token: string }[]
+      | null;
   };
 
   const orders = ((ordersRes.data ?? []) as unknown as Row[]).map((row) => ({
     ...row,
     factory: Array.isArray(row.factory) ? row.factory[0] ?? null : row.factory,
     seller: Array.isArray(row.seller) ? row.seller[0] ?? null : row.seller,
+    cpo: Array.isArray(row.cpo) ? row.cpo[0] ?? null : row.cpo,
   }));
 
   return (
@@ -69,7 +74,7 @@ export default async function AdminCustomerOrdersPage({
       <PageHeader
         eyebrow="Retail"
         title="Pedidos de clientas"
-        description="Todos los pedidos cargados por las vendedoras. La generación de PO llega en la siguiente etapa."
+        description="Genera el link de Purchase Order por pedido y envíalo al proveedor. Las reposiciones se marcan en ámbar."
       />
 
       <div className="mb-6">
@@ -91,12 +96,7 @@ export default async function AdminCustomerOrdersPage({
       ) : (
         <div className="space-y-3">
           {orders.map((order) => (
-            <CustomerOrderCard
-              key={order.id}
-              order={order}
-              href={`/admin/customer-orders/${order.id}`}
-              showSeller
-            />
+            <AdminCustomerOrderRow key={order.id} order={order} />
           ))}
         </div>
       )}
