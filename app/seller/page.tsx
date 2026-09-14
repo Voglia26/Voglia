@@ -1,44 +1,87 @@
+import { Suspense } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSession, signOut } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getSession } from "@/lib/auth";
+import type { CustomerOrder } from "@/lib/types";
+import { CustomerOrderCard } from "@/components/customer-orders/order-badges";
+import { SellerCancelledFilter } from "@/components/customer-orders/seller-cancelled-filter";
 import { Button } from "@/components/ui/button";
-import { VogliaLogo } from "@/components/brand/logo";
+import { Plus } from "lucide-react";
 
-export default async function SellerHomePage() {
+export default async function SellerHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cancelled?: string }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "admin") {
-    // Admins can open /seller, but default home is admin panel
+  if (session.role !== "seller") {
+    redirect(session.role === "admin" ? "/admin/customer-orders" : "/login");
   }
 
-  async function logout() {
-    "use server";
-    await signOut();
-    redirect("/login");
+  const params = await searchParams;
+  const supabase = createAdminClient();
+  let query = supabase
+    .from("customer_orders")
+    .select("*, factory:factories(id, name)")
+    .eq("seller_id", session.id)
+    .order("ordered_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (params.cancelled === "hide") {
+    query = query.neq("status", "cancelled");
   }
+
+  const { data } = await query;
+
+  type Row = CustomerOrder & {
+    factory: { id: string; name: string } | { id: string; name: string }[] | null;
+  };
+
+  const orders = ((data ?? []) as unknown as Row[]).map((row) => ({
+    ...row,
+    factory: Array.isArray(row.factory) ? row.factory[0] ?? null : row.factory,
+  }));
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b px-6 py-4 flex items-center justify-between gap-4">
-        <VogliaLogo width={180} height={51} className="h-10 w-auto" />
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-muted-foreground">
-            {session.displayName}
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="eyebrow text-[10px]">Seller</p>
+          <h1 className="font-heading text-3xl mt-1">Pedidos de clientas</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Solo ves tus propios pedidos.
           </p>
-          <form action={logout}>
-            <Button type="submit" variant="outline" size="sm">
-              Sign out
-            </Button>
-          </form>
+          <div className="mt-2">
+            <Suspense fallback={null}>
+              <SellerCancelledFilter />
+            </Suspense>
+          </div>
         </div>
-      </header>
-      <main className="max-w-lg mx-auto px-6 py-16 text-center animate-fade-up">
-        <p className="eyebrow text-[10px] mb-3">Seller</p>
-        <h1 className="font-heading text-3xl">Pedidos de clientas</h1>
-        <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-          El módulo de pedidos de clientas se habilita en la próxima etapa.
-          Tu cuenta ya está lista.
+        <Link href="/seller/orders/new">
+          <Button type="button">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo pedido
+          </Button>
+        </Link>
+      </div>
+
+      {orders.length === 0 ? (
+        <p className="text-sm text-muted-foreground border rounded-lg p-6">
+          Todavía no tienes pedidos. Crea el primero para enviarlo a fábrica.
         </p>
-      </main>
+      ) : (
+        <div className="space-y-3">
+          {orders.map((order) => (
+            <CustomerOrderCard
+              key={order.id}
+              order={order}
+              href={`/seller/orders/${order.id}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

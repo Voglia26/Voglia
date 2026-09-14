@@ -12,6 +12,86 @@ export type AppUser = {
   created_at: string;
 };
 
+export type CustomerOrderStatus =
+  | "ordered"
+  | "in_transit"
+  | "arrived_panama"
+  | "delivered"
+  | "cancelled";
+
+export const CUSTOMER_ORDER_STATUS_FLOW: CustomerOrderStatus[] = [
+  "ordered",
+  "in_transit",
+  "arrived_panama",
+  "delivered",
+  "cancelled",
+];
+
+/** Statuses a seller can pick while editing (cancel uses a dedicated action). */
+export const CUSTOMER_ORDER_EDITABLE_STATUSES: CustomerOrderStatus[] = [
+  "ordered",
+  "in_transit",
+  "arrived_panama",
+  "delivered",
+];
+
+export const CUSTOMER_ORDER_STATUS_LABELS: Record<
+  CustomerOrderStatus,
+  string
+> = {
+  ordered: "Pedido",
+  in_transit: "En tránsito",
+  arrived_panama: "Recibido en Panamá",
+  delivered: "Entregado a clienta",
+  cancelled: "Cancelado",
+};
+
+export type CustomerOrder = {
+  id: string;
+  seller_id: string;
+  product_name: string;
+  notes: string | null;
+  photo_url: string | null;
+  customer_name: string;
+  ordered_at: string;
+  lightspeed_sku: string | null;
+  factory_id: string;
+  due_date: string | null;
+  is_urgent: boolean;
+  is_restock: boolean;
+  status: CustomerOrderStatus;
+  arrived_panama_at: string | null;
+  delivered_at: string | null;
+  customer_purchase_order_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Days between ordered_at and delivered_at (inclusive calendar span). */
+export function customerOrderLeadDays(
+  orderedAt: string | null | undefined,
+  deliveredAt: string | null | undefined
+): number | null {
+  if (!orderedAt || !deliveredAt) return null;
+  const start = new Date(`${orderedAt.slice(0, 10)}T12:00:00`);
+  const end = new Date(`${deliveredAt.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const diff = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+  return diff >= 0 ? diff : null;
+}
+
+export function isCustomerOrderLocked(
+  order: Pick<CustomerOrder, "customer_purchase_order_id">
+): boolean {
+  return !!order.customer_purchase_order_id;
+}
+
+export function isCustomerOrderCancelled(
+  order: Pick<CustomerOrder, "status">
+): boolean {
+  return order.status === "cancelled";
+}
+
 export type PurchaseOrderStatus =
   | "pending"
   | "approved"
