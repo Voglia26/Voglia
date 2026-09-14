@@ -32,7 +32,7 @@ export default async function AdminCustomerOrderDetailPage({
   const { data } = await supabase
     .from("customer_orders")
     .select(
-      "*, factory:factories(id, name), seller:app_users(id, display_name, username), cpo:customer_purchase_orders(id, token)"
+      "*, factory:factories(id, name), seller:app_users(id, display_name, username), cpo:customer_purchase_orders!customer_orders_customer_purchase_order_id_fkey(id, token)"
     )
     .eq("id", id)
     .maybeSingle();

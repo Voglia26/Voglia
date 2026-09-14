@@ -24,7 +24,7 @@ export default async function AdminCustomerOrdersPage({
   let query = supabase
     .from("customer_orders")
     .select(
-      "*, factory:factories(id, name), seller:app_users(id, display_name), cpo:customer_purchase_orders(id, token)"
+      "*, factory:factories(id, name), seller:app_users(id, display_name), cpo:customer_purchase_orders!customer_orders_customer_purchase_order_id_fkey(id, token)"
     )
     .order("ordered_at", { ascending: false })
     .order("created_at", { ascending: false });
