@@ -49,6 +49,7 @@ export default async function NewCustomerOrderPage({
         factories={factories ?? []}
         action={createCustomerOrder}
         submitLabel="Crear pedido"
+        defaultOrderedAt={new Date().toISOString().slice(0, 10)}
       />
     </div>
   );
