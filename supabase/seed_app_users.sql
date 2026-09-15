@@ -3,18 +3,18 @@
 --
 -- Credentials (change after first login):
 --   admin / admin123  (or your ADMIN_PASSWORD env value)
---   lilly / Lilly-tmp-26
---   linda / Linda-tmp-26
---   gaby / Gaby-tmp-26
---   tanya / Tanya-tmp-26
---   daniela / Daniela-tmp-26
---   valentina / Valentina-tmp-26
---   alejandra / Alejandra-tmp-26
---   ismary / Ismary-tmp-26
---   myra / Myra-tmp-26
---   zindy / Zindy-tmp-26
---   maryeli / Maryeli-tmp-26
---   rachelle / Rachelle-tmp-26
+--   lilly / lilly26
+--   linda / linda26
+--   gaby / gaby26
+--   tanya / tanya26
+--   daniela / daniela26
+--   valentina / valentina26
+--   alejandra / alejandra26
+--   ismary / ismary26
+--   myra / myra26
+--   zindy / zindy26
+--   maryeli / maryeli26
+--   rachelle / rachelle26
 
 insert into app_users (id, username, password_hash, display_name, role, active) values
   (
@@ -28,7 +28,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000010',
     'lilly',
-    'ac24fd8dbf0cfe59097d0ffab8f117a8:492508f6522773a006f4f3c7c2b07535c125f810990de6047785d30ea4a8b55118441b80a9edd256b02490e56723821eee0498012b0772c2ba1dc2bb40f756c8',
+    '19adc1d697cd0847b88a37e3aec1c749:3745afdfb5d38036b77bfe1a6c61c97074e605ec6e17c41a962474861927fbc7b012726da2c800e91575887440b7edd205db060d98eba6a4d22a8dcbdca089ab',
     'Lilly',
     'seller',
     true
@@ -36,7 +36,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000011',
     'linda',
-    '0fb1366b909f07a9f09cfcf27b028430:dc4f8194b894d5f3579bd176978209f6873a349044712012196e209fbfcd44c40bf4cb0741858eb2892d951e319cbf24a8f91bf21afb4897f47ae6e0cd54dcfd',
+    '1807c6053e8d85c6c71ce00935c5adc6:17912f0ab9c708edb09c8992790eacb9e3634b4ea1f017f634f75e4330734347a1c39d6c416863d016a933bea90ce0e262d91099594bb3b096b41bd705afa8b1',
     'Linda',
     'seller',
     true
@@ -44,7 +44,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000012',
     'gaby',
-    'ccc19583f6cc676162f5f0f2ce70c31f:63c96c25f7cabc62f3bc360c5160b4f65a58f79432db044937d5d168147e91cc8a9b287531690deacf0d5094a9a1c3225d88aefe604758e7fd467c31de4844b3',
+    'd7bc4693a866b6c0a84af14a3e6c9ec1:8b8da84cc7b1da7d60d7ce2be102b1578740d32c7d3ba15ee447a464215961b224ba04353413aa9a79b8a04ef5f13c1ea5104385731f8ab25e5ad174794e39ea',
     'Gaby',
     'seller',
     true
@@ -52,7 +52,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000013',
     'tanya',
-    '49a1369599ddd6f7789df1c68dd4b21f:ec78cbac681b80bf92dc2f6ccb5596a98a23e3f28a0c69c48a33792bb30ed9e47d386278ea187b18d3aed5a1fc28a2685a9a12c1ca65e82a8bf5138c77b42748',
+    '6b548533d04c4bbaee1de324c4de9738:6f8edec1e03c215daa3bd622b9e6d1c9ba8cbc77b519c2c597b22b4f12187cf4b29df55c8fc9e412ce08aaa5421716ae95ad92da7dbb557c9e1329fd5907a01c',
     'Tanya',
     'seller',
     true
@@ -60,7 +60,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000014',
     'daniela',
-    '674f76b3619b5a4dc2a408cf6ac8d581:618f56c77287933b9adfbd22b69ad3c73774e15ed038927d76a3bcc0a921c5e67a57215eea363c77343e25f75f2d539ac3b40e0801632c1bd05fc31ea4793463',
+    '04a0d281902caf393ecdc2ad8787508d:0996e17110136896ec9bec421dc555821009bada30fcb0d5d02d25dbec7d8871011c4cbfd201e29de214cedc1c2ad88e24cfa2926925b0f79b63b837c2d1e6d0',
     'Daniela',
     'seller',
     true
@@ -68,7 +68,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000015',
     'valentina',
-    '033a333e62752103a940a462b1c00b81:1dd9cf361145ffb820a542cf6c00532208d9c60ca40f6243e9281a44078dd87fb7f1335a8ce9d6f9b5248bfd6d134294177648314e8d37312e294c20f5e1caf9',
+    'ce51dbffb7ab6bdc2b39a0795c981c96:fad8e8ed7ebe8f24a9cba0592680f27a8574bda795bfa29eea25d7050f0cd6a3bd056a03d86c1108981aa5f712b5df14fb522eba07f9e4b1ad4739d6e9adbfac',
     'Valentina',
     'seller',
     true
@@ -76,7 +76,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000016',
     'alejandra',
-    '47be63a37bc64b3f59ae822bfa475d35:8fbfb68e9a5de868b8d93dab5442d111f5a120ae2458e4a90f747747dc334b8eb939699da50533b3194b6d001123b8ae004448c5b3df7d4ee3d07272c1aef653',
+    'cf8fe37b26298409cd150f8834ad0b7a:59a53d3d450dd314d75229f8e93f408587e641240865d223195991b4fa16b61e2c8fbf68bedf9388986d069bd4aee13aba642512ea8eea1390f2643db1764744',
     'Alejandra',
     'seller',
     true
@@ -84,7 +84,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000017',
     'ismary',
-    'f86e12a5784f4399c9bc9059139c64ad:9d79265c70e075244d0f573035507b1b33c0144e1e6d3523fc1fb01f5e3874b006ac90fd794578009ae0df6aaaab9e3616e890a206598be04811c26e8e410e99',
+    '59de08e782db7bf7df7bf9d7989b91b3:0cc8da7661d5cf3533fa32ac7b64b34e3081b0dd776f8c1789aa209f1ae3b607a68bae8ce9a40abedccc3e2daa0bdf1de3e156e70f24e7a779fd9e44e99e6416',
     'Ismary',
     'seller',
     true
@@ -92,7 +92,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000018',
     'myra',
-    '21d368c6c03da54d87898be1227fddfa:9cf3a22fb0ca854ee547dd851501ae01db98e0f95c5e65305f9d94f96cf82120f3e6d6a1d4992987fbba4ac7683651fb46e4bf47776c59deeb0c0f06a6997e58',
+    'e8a4cb85d4170d65d5e3b996277565d8:a61a07613f4f0290c9ae2678594f976ed1c8d3da81d1b3732cab29ff3e30fcec3b305aa36b9ed3a7da56ddee7ea37b549c235d53a2b6626d02f454821629e2df',
     'Myra',
     'seller',
     true
@@ -100,7 +100,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-000000000019',
     'zindy',
-    '4c8ce688d8bdaf413a5e5e9f493d40f2:fadd136b2a7206a0f05cd4364fa6bd6953293f3e3ed4aff003bde59a0d05e40b75ad5408305f146f36c8eb0a9ababcc648695769cc3312164b548c85252cc879',
+    '9488c5d9ea7b66f2a7273e4110ba975d:d33c7d9b433539a649111ff6798ff786ace7d99ca57a7e7072087560950b708cfe3ee256805055c7d28f35807e34584a171d071eb731f15f8e413da38cfaeee7',
     'Zindy',
     'seller',
     true
@@ -108,7 +108,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-00000000001a',
     'maryeli',
-    '78e5b52e75204be011c87ffaf7ef92c5:2118d789eb0f9acf4e7a86c4ee1b74772dbf4a251049a688fb61021eb6c6142637e4031e9f1b797953360b5a78914ce73f441944aad41a6e2d071075d9763ada',
+    '1704ce11b0df9d47e77c33257006d529:157740018369a178342f55a68015f109d827c90611059f20aedad1439093acd1d72f2d83ee6ea10ec0d705383813ca4355ee3e838bf096ac0f2dedd330d62c88',
     'Maryeli',
     'seller',
     true
@@ -116,7 +116,7 @@ insert into app_users (id, username, password_hash, display_name, role, active) 
   (
     'a0000000-0000-4000-8000-00000000001b',
     'rachelle',
-    'b75bd878529f6196b0e70c0b0f150de9:2b4ce4f37fca6af009699c2427186f9bf810d2dcebf2646e66f55928a0a35ed6f793224345bbf39b0f5e11836c2888dc81e7d786557f0370378593881a52b2a9',
+    '21e54a810c1e5c359c39e592ff0f45ea:445eef61bd9076287930fb20bf5049e42b85f6d045985813f654966652437f2cf7d459c1c2a33fc397e81cc1b6e0df873a8539b1227ad5e05ffc3acf7bf6f8eb',
     'Rachelle',
     'seller',
     true

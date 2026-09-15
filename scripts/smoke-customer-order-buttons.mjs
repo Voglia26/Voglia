@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
 const USER = process.env.SMOKE_SELLER_USER ?? "lilly";
-const PASS = process.env.SMOKE_SELLER_PASS ?? "Lilly-tmp-26";
+const PASS = process.env.SMOKE_SELLER_PASS ?? "lilly26";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
