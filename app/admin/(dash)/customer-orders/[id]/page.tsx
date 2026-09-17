@@ -70,6 +70,17 @@ export default async function AdminCustomerOrderDetailPage({
     { label: "Notas", value: order.notes?.trim() || "—" },
     { label: "Proveedor", value: factory?.name ?? "—" },
     { label: "SKU Lightspeed", value: order.lightspeed_sku?.trim() || "—" },
+    { label: "SKU Proveedor", value: order.provider_sku?.trim() || "—" },
+    { label: "Color de oro", value: order.gold_color?.trim() || "—" },
+    {
+      label: "Forma del diamante",
+      value: order.diamond_shape?.trim() || "—",
+    },
+    {
+      label: "Tipo de gemstone",
+      value: order.gemstone_type?.trim() || "—",
+    },
+    { label: "Tamaño / talla", value: order.size?.trim() || "—" },
     { label: "Fecha del pedido", value: order.ordered_at.slice(0, 10) },
     {
       label: "Fecha límite",

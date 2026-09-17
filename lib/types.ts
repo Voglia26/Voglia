@@ -46,6 +46,44 @@ export const CUSTOMER_ORDER_STATUS_LABELS: Record<
   cancelled: "Cancelado",
 };
 
+/** Stored values for customer-order product selects (English; shown as-is on /cpo). */
+export const GOLD_COLOR_OPTIONS = [
+  "Yellow Gold",
+  "White Gold",
+  "Rose Gold",
+  "Two-Tone",
+] as const;
+
+export const DIAMOND_SHAPE_OPTIONS = [
+  "Round",
+  "Oval",
+  "Emerald",
+  "Pear",
+  "Marquise",
+  "Cushion",
+  "Princess",
+  "Heart",
+  "Radiant",
+  "Asscher",
+  "Other",
+] as const;
+
+export const GEMSTONE_TYPE_OPTIONS = [
+  "Diamond",
+  "Lab Diamond",
+  "Sapphire",
+  "Emerald",
+  "Ruby",
+  "Garnet",
+  "Turquoise",
+  "Pearl",
+  "Other",
+] as const;
+
+export type GoldColor = (typeof GOLD_COLOR_OPTIONS)[number];
+export type DiamondShape = (typeof DIAMOND_SHAPE_OPTIONS)[number];
+export type GemstoneType = (typeof GEMSTONE_TYPE_OPTIONS)[number];
+
 export type CustomerOrder = {
   id: string;
   seller_id: string;
@@ -55,6 +93,11 @@ export type CustomerOrder = {
   customer_name: string;
   ordered_at: string;
   lightspeed_sku: string | null;
+  provider_sku: string | null;
+  gold_color: string | null;
+  diamond_shape: string | null;
+  gemstone_type: string | null;
+  size: string | null;
   factory_id: string;
   due_date: string | null;
   is_urgent: boolean;

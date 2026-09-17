@@ -5,7 +5,30 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSession, requireSeller } from "@/lib/auth";
 import type { CustomerOrderStatus } from "@/lib/types";
-import { CUSTOMER_ORDER_EDITABLE_STATUSES } from "@/lib/types";
+import {
+  CUSTOMER_ORDER_EDITABLE_STATUSES,
+  DIAMOND_SHAPE_OPTIONS,
+  GEMSTONE_TYPE_OPTIONS,
+  GOLD_COLOR_OPTIONS,
+} from "@/lib/types";
+
+const GOLD_COLORS = new Set<string>(GOLD_COLOR_OPTIONS);
+const DIAMOND_SHAPES = new Set<string>(DIAMOND_SHAPE_OPTIONS);
+const GEMSTONE_TYPES = new Set<string>(GEMSTONE_TYPE_OPTIONS);
+
+function parseOptionalSelect(
+  value: unknown,
+  allowed: Set<string>
+): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  return allowed.has(raw) ? raw : null;
+}
+
+function parseOptionalText(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  return raw || null;
+}
 
 const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
@@ -88,11 +111,22 @@ export async function createCustomerOrder(formData: FormData) {
   const payload = {
     seller_id: session.id,
     product_name,
-    notes: String(formData.get("notes") ?? "").trim() || null,
-    photo_url: String(formData.get("photo_url") ?? "").trim() || null,
+    notes: parseOptionalText(formData.get("notes")),
+    photo_url: parseOptionalText(formData.get("photo_url")),
     customer_name,
     ordered_at,
-    lightspeed_sku: String(formData.get("lightspeed_sku") ?? "").trim() || null,
+    lightspeed_sku: parseOptionalText(formData.get("lightspeed_sku")),
+    provider_sku: parseOptionalText(formData.get("provider_sku")),
+    gold_color: parseOptionalSelect(formData.get("gold_color"), GOLD_COLORS),
+    diamond_shape: parseOptionalSelect(
+      formData.get("diamond_shape"),
+      DIAMOND_SHAPES
+    ),
+    gemstone_type: parseOptionalSelect(
+      formData.get("gemstone_type"),
+      GEMSTONE_TYPES
+    ),
+    size: parseOptionalText(formData.get("size")),
     factory_id,
     due_date: parseDate(formData.get("due_date")),
     is_urgent: parseBool(formData.get("is_urgent")),
@@ -166,8 +200,21 @@ export async function updateCustomerOrder(formData: FormData) {
     const factory_id = String(formData.get("factory_id") ?? "").trim();
     if (product_name) patch.product_name = product_name;
     if (factory_id) patch.factory_id = factory_id;
-    patch.lightspeed_sku =
-      String(formData.get("lightspeed_sku") ?? "").trim() || null;
+    patch.lightspeed_sku = parseOptionalText(formData.get("lightspeed_sku"));
+    patch.provider_sku = parseOptionalText(formData.get("provider_sku"));
+    patch.gold_color = parseOptionalSelect(
+      formData.get("gold_color"),
+      GOLD_COLORS
+    );
+    patch.diamond_shape = parseOptionalSelect(
+      formData.get("diamond_shape"),
+      DIAMOND_SHAPES
+    );
+    patch.gemstone_type = parseOptionalSelect(
+      formData.get("gemstone_type"),
+      GEMSTONE_TYPES
+    );
+    patch.size = parseOptionalText(formData.get("size"));
   }
 
   await client.from("customer_orders").update(patch).eq("id", id);

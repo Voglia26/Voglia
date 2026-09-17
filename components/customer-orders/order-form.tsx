@@ -4,6 +4,9 @@ import type { Factory } from "@/lib/types";
 import {
   CUSTOMER_ORDER_EDITABLE_STATUSES,
   CUSTOMER_ORDER_STATUS_LABELS,
+  DIAMOND_SHAPE_OPTIONS,
+  GEMSTONE_TYPE_OPTIONS,
+  GOLD_COLOR_OPTIONS,
   isCustomerOrderLocked,
   type CustomerOrder,
 } from "@/lib/types";
@@ -13,6 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
+const selectClassName =
+  "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50";
 
 export function CustomerOrderForm({
   factories,
@@ -39,8 +45,9 @@ export function CustomerOrderForm({
 
         {locked && (
           <p className="text-sm rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100 dark:border-amber-900">
-            Este pedido ya tiene Purchase Order. Producto, proveedor y SKU no se
-            pueden editar. Sí puedes actualizar estado y fechas.
+            Este pedido ya tiene Purchase Order. Producto, proveedor, SKUs y
+            características del producto no se pueden editar. Sí puedes
+            actualizar estado y fechas.
           </p>
         )}
 
@@ -61,9 +68,73 @@ export function CustomerOrderForm({
             id="notes"
             name="notes"
             rows={4}
-            placeholder="Oro, talla, piedras, detalles…"
+            placeholder="Detalles extras que no cubren los campos de abajo…"
             defaultValue={order?.notes ?? ""}
           />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="gold_color">Color de oro</Label>
+            <select
+              id="gold_color"
+              name="gold_color"
+              disabled={locked}
+              defaultValue={order?.gold_color ?? ""}
+              className={selectClassName}
+            >
+              <option value="">Sin especificar</option>
+              {GOLD_COLOR_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="diamond_shape">Forma del diamante</Label>
+            <select
+              id="diamond_shape"
+              name="diamond_shape"
+              disabled={locked}
+              defaultValue={order?.diamond_shape ?? ""}
+              className={selectClassName}
+            >
+              <option value="">Sin especificar</option>
+              {DIAMOND_SHAPE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="gemstone_type">Tipo de gemstone</Label>
+            <select
+              id="gemstone_type"
+              name="gemstone_type"
+              disabled={locked}
+              defaultValue={order?.gemstone_type ?? ""}
+              className={selectClassName}
+            >
+              <option value="">Sin especificar</option>
+              {GEMSTONE_TYPE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="size">Tamaño / talla</Label>
+            <Input
+              id="size"
+              name="size"
+              disabled={locked}
+              defaultValue={order?.size ?? ""}
+              placeholder="Ej. 7, 16 cm…"
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -106,15 +177,27 @@ export function CustomerOrderForm({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="lightspeed_sku">SKU Lightspeed</Label>
-          <Input
-            id="lightspeed_sku"
-            name="lightspeed_sku"
-            disabled={locked}
-            defaultValue={order?.lightspeed_sku ?? ""}
-            placeholder="Escribe el SKU manualmente"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="lightspeed_sku">SKU Lightspeed</Label>
+            <Input
+              id="lightspeed_sku"
+              name="lightspeed_sku"
+              disabled={locked}
+              defaultValue={order?.lightspeed_sku ?? ""}
+              placeholder="Uso interno"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="provider_sku">SKU Proveedor</Label>
+            <Input
+              id="provider_sku"
+              name="provider_sku"
+              disabled={locked}
+              defaultValue={order?.provider_sku ?? ""}
+              placeholder="Código de la fábrica"
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -125,7 +208,7 @@ export function CustomerOrderForm({
             required
             disabled={locked}
             defaultValue={order?.factory_id ?? ""}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+            className={selectClassName}
           >
             <option value="" disabled>
               Selecciona una fábrica…
@@ -168,7 +251,7 @@ export function CustomerOrderForm({
                 id="status"
                 name="status"
                 defaultValue={order.status}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                className={selectClassName}
               >
                 {CUSTOMER_ORDER_EDITABLE_STATUSES.map((s) => (
                   <option key={s} value={s}>

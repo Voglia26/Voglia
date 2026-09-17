@@ -93,7 +93,12 @@ function OrderCardBody({
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>Pedido {order.ordered_at.slice(0, 10)}</span>
-        {order.lightspeed_sku && <span>SKU {order.lightspeed_sku}</span>}
+        {order.lightspeed_sku && (
+          <span>SKU LS {order.lightspeed_sku}</span>
+        )}
+        {order.provider_sku && (
+          <span>SKU Prov. {order.provider_sku}</span>
+        )}
         {order.due_date && <span>Límite {order.due_date.slice(0, 10)}</span>}
         {lead !== null && <span>{lead} días hasta entrega</span>}
         {order.customer_purchase_order_id && (
