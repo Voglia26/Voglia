@@ -54,6 +54,56 @@ function parseBool(value: unknown): boolean {
   return v === "on" || v === "true" || v === "1";
 }
 
+const NEW_FACTORY_OPTION = "__new__";
+
+function normalizeFactoryName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+/** Resolve factory_id from form: existing id, or find/create by name (case-insensitive). */
+async function resolveFactoryId(
+  formData: FormData
+): Promise<string | null> {
+  const factoryId = String(formData.get("factory_id") ?? "").trim();
+  const newNameRaw = String(formData.get("factory_name_new") ?? "");
+  const newName = normalizeFactoryName(newNameRaw);
+
+  const client = createAdminClient();
+
+  if (factoryId && factoryId !== NEW_FACTORY_OPTION) {
+    const { data } = await client
+      .from("factories")
+      .select("id")
+      .eq("id", factoryId)
+      .maybeSingle();
+    return data?.id ?? null;
+  }
+
+  if (!newName) return null;
+
+  const { data: existing } = await client
+    .from("factories")
+    .select("id, name");
+
+  const match = (existing ?? []).find(
+    (f) => normalizeFactoryName(f.name).toLowerCase() === newName.toLowerCase()
+  );
+  if (match) return match.id;
+
+  const { data: created, error } = await client
+    .from("factories")
+    .insert({ name: newName })
+    .select("id")
+    .single();
+
+  if (error || !created) return null;
+
+  revalidatePath("/admin/factories");
+  revalidatePath("/seller/orders/new");
+  revalidatePath("/admin/customer-orders");
+  return created.id;
+}
+
 export async function uploadCustomerOrderPhoto(
   formData: FormData
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
@@ -99,12 +149,16 @@ export async function createCustomerOrder(formData: FormData) {
 
   const product_name = String(formData.get("product_name") ?? "").trim();
   const customer_name = String(formData.get("customer_name") ?? "").trim();
-  const factory_id = String(formData.get("factory_id") ?? "").trim();
   const ordered_at =
     parseDate(formData.get("ordered_at")) ??
     new Date().toISOString().slice(0, 10);
 
-  if (!product_name || !customer_name || !factory_id) {
+  if (!product_name || !customer_name) {
+    redirect("/seller/orders/new?error=missing");
+  }
+
+  const factory_id = await resolveFactoryId(formData);
+  if (!factory_id) {
     redirect("/seller/orders/new?error=missing");
   }
 
@@ -197,8 +251,8 @@ export async function updateCustomerOrder(formData: FormData) {
 
   if (!locked) {
     const product_name = String(formData.get("product_name") ?? "").trim();
-    const factory_id = String(formData.get("factory_id") ?? "").trim();
     if (product_name) patch.product_name = product_name;
+    const factory_id = await resolveFactoryId(formData);
     if (factory_id) patch.factory_id = factory_id;
     patch.lightspeed_sku = parseOptionalText(formData.get("lightspeed_sku"));
     patch.provider_sku = parseOptionalText(formData.get("provider_sku"));

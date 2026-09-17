@@ -12,6 +12,7 @@ import {
 } from "@/lib/types";
 import { CustomerOrderPhotoField } from "@/components/customer-orders/photo-field";
 import { CancelCustomerOrderButton } from "@/components/customer-orders/cancel-button";
+import { FactorySelectField } from "@/components/customer-orders/factory-select-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -200,26 +201,11 @@ export function CustomerOrderForm({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="factory_id">Proveedor / fábrica</Label>
-          <select
-            id="factory_id"
-            name="factory_id"
-            required
-            disabled={locked}
-            defaultValue={order?.factory_id ?? ""}
-            className={selectClassName}
-          >
-            <option value="" disabled>
-              Selecciona una fábrica…
-            </option>
-            {factories.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <FactorySelectField
+          factories={factories}
+          defaultFactoryId={order?.factory_id}
+          disabled={locked}
+        />
 
         <div className="flex flex-wrap gap-6">
           <label className="inline-flex items-center gap-2 text-sm">
