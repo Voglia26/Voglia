@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getSession } from "@/lib/auth";
 import { createCustomerOrder } from "@/app/seller/actions";
 import { CustomerOrderForm } from "@/components/customer-orders/order-form";
@@ -15,11 +14,6 @@ export default async function NewCustomerOrderPage({
   if (!session || session.role !== "seller") redirect("/login");
 
   const { error } = await searchParams;
-  const supabase = createAdminClient();
-  const { data: factories } = await supabase
-    .from("factories")
-    .select("id, name")
-    .order("name");
 
   return (
     <div className="space-y-6">
@@ -33,7 +27,8 @@ export default async function NewCustomerOrderPage({
         </Link>
         <h1 className="font-heading text-3xl">Nuevo pedido</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Completa los datos de la clienta y el producto.
+          Completa los datos de la clienta y el producto. El proveedor lo asigna
+          el admin.
         </p>
       </div>
 
@@ -46,7 +41,6 @@ export default async function NewCustomerOrderPage({
       )}
 
       <CustomerOrderForm
-        factories={factories ?? []}
         action={createCustomerOrder}
         submitLabel="Crear pedido"
         defaultOrderedAt={new Date().toISOString().slice(0, 10)}

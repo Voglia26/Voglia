@@ -13,20 +13,24 @@ import { CopyCpoLink } from "@/components/customer-orders/copy-cpo-link";
 
 export function CustomerOrderStatusBadge({
   status,
+  customLabel,
 }: {
   status: CustomerOrderStatus;
+  customLabel?: string | null;
 }) {
   const variant =
     status === "cancelled"
       ? "destructive"
       : status === "delivered"
         ? "default"
-        : status === "arrived_panama"
+        : status === "pending_order"
           ? "secondary"
           : "outline";
-  return (
-    <Badge variant={variant}>{CUSTOMER_ORDER_STATUS_LABELS[status]}</Badge>
-  );
+  const label =
+    status === "cancelled"
+      ? CUSTOMER_ORDER_STATUS_LABELS.cancelled
+      : customLabel?.trim() || CUSTOMER_ORDER_STATUS_LABELS[status];
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 export function RestockBadge() {
@@ -48,6 +52,7 @@ export type CustomerOrderListRow = CustomerOrder & {
   factory: { id: string; name: string } | null;
   seller?: { id: string; display_name: string } | null;
   cpo?: { id: string; token: string } | null;
+  custom_status?: { id: string; label: string } | null;
 };
 
 function OrderCardBody({
@@ -59,6 +64,9 @@ function OrderCardBody({
 }) {
   const lead = customerOrderLeadDays(order.ordered_at, order.delivered_at);
   const cancelled = order.status === "cancelled";
+  const factoryLabel = order.factory?.name
+    ? order.factory.name
+    : "Sin proveedor";
 
   return (
     <>
@@ -79,7 +87,7 @@ function OrderCardBody({
             )}
           >
             {order.customer_name}
-            {order.factory?.name ? ` · ${order.factory.name}` : ""}
+            {` · ${factoryLabel}`}
             {showSeller && order.seller?.display_name
               ? ` · ${order.seller.display_name}`
               : ""}
@@ -88,7 +96,10 @@ function OrderCardBody({
         <div className="flex flex-wrap gap-1.5 justify-end">
           {order.is_urgent && !cancelled && <UrgentBadge />}
           {order.is_restock && <RestockBadge />}
-          <CustomerOrderStatusBadge status={order.status} />
+          <CustomerOrderStatusBadge
+            status={order.status}
+            customLabel={order.custom_status?.label}
+          />
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

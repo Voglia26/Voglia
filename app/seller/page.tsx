@@ -24,7 +24,9 @@ export default async function SellerHomePage({
   const supabase = createAdminClient();
   let query = supabase
     .from("customer_orders")
-    .select("*, factory:factories(id, name)")
+    .select(
+      "*, factory:factories(id, name), custom_status:customer_order_custom_statuses(id, label)"
+    )
     .eq("seller_id", session.id)
     .order("ordered_at", { ascending: false })
     .order("created_at", { ascending: false });
@@ -37,11 +39,18 @@ export default async function SellerHomePage({
 
   type Row = CustomerOrder & {
     factory: { id: string; name: string } | { id: string; name: string }[] | null;
+    custom_status:
+      | { id: string; label: string }
+      | { id: string; label: string }[]
+      | null;
   };
 
   const orders = ((data ?? []) as unknown as Row[]).map((row) => ({
     ...row,
     factory: Array.isArray(row.factory) ? row.factory[0] ?? null : row.factory,
+    custom_status: Array.isArray(row.custom_status)
+      ? row.custom_status[0] ?? null
+      : row.custom_status,
   }));
 
   return (

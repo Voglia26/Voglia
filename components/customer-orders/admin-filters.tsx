@@ -12,9 +12,11 @@ import { Label } from "@/components/ui/label";
 export function CustomerOrderFilters({
   sellers,
   factories,
+  customStatuses = [],
 }: {
   sellers: { id: string; display_name: string }[];
   factories: { id: string; name: string }[];
+  customStatuses?: { id: string; label: string }[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -75,6 +77,11 @@ export function CustomerOrderFilters({
           {CUSTOMER_ORDER_STATUS_FLOW.map((s) => (
             <option key={s} value={s}>
               {CUSTOMER_ORDER_STATUS_LABELS[s]}
+            </option>
+          ))}
+          {customStatuses.map((s) => (
+            <option key={s.id} value={`custom:${s.id}`}>
+              {s.label}
             </option>
           ))}
         </select>

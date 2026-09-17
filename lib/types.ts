@@ -13,25 +13,22 @@ export type AppUser = {
 };
 
 export type CustomerOrderStatus =
+  | "pending_order"
   | "ordered"
-  | "in_transit"
-  | "arrived_panama"
   | "delivered"
   | "cancelled";
 
 export const CUSTOMER_ORDER_STATUS_FLOW: CustomerOrderStatus[] = [
+  "pending_order",
   "ordered",
-  "in_transit",
-  "arrived_panama",
   "delivered",
   "cancelled",
 ];
 
-/** Statuses a seller can pick while editing (cancel uses a dedicated action). */
-export const CUSTOMER_ORDER_EDITABLE_STATUSES: CustomerOrderStatus[] = [
+/** Base statuses the admin can assign (cancel uses a dedicated action). */
+export const CUSTOMER_ORDER_ADMIN_STATUSES: CustomerOrderStatus[] = [
+  "pending_order",
   "ordered",
-  "in_transit",
-  "arrived_panama",
   "delivered",
 ];
 
@@ -39,11 +36,17 @@ export const CUSTOMER_ORDER_STATUS_LABELS: Record<
   CustomerOrderStatus,
   string
 > = {
+  pending_order: "Pendiente por pedir",
   ordered: "Pedido",
-  in_transit: "En tránsito",
-  arrived_panama: "Recibido en Panamá",
-  delivered: "Entregado a clienta",
+  delivered: "Entregado",
   cancelled: "Cancelado",
+};
+
+export type CustomerOrderCustomStatus = {
+  id: string;
+  label: string;
+  active: boolean;
+  created_at: string;
 };
 
 /** Stored values for customer-order product selects (English; shown as-is on /cpo). */
@@ -98,11 +101,12 @@ export type CustomerOrder = {
   diamond_shape: string | null;
   gemstone_type: string | null;
   size: string | null;
-  factory_id: string;
+  factory_id: string | null;
   due_date: string | null;
   is_urgent: boolean;
   is_restock: boolean;
   status: CustomerOrderStatus;
+  custom_status_id: string | null;
   arrived_panama_at: string | null;
   delivered_at: string | null;
   customer_purchase_order_id: string | null;
@@ -133,6 +137,20 @@ export function isCustomerOrderCancelled(
   order: Pick<CustomerOrder, "status">
 ): boolean {
   return order.status === "cancelled";
+}
+
+export function customerOrderStatusLabel(
+  order: Pick<CustomerOrder, "status" | "custom_status_id"> & {
+    custom_status?: { label: string } | null;
+  }
+): string {
+  if (order.status === "cancelled") {
+    return CUSTOMER_ORDER_STATUS_LABELS.cancelled;
+  }
+  if (order.custom_status_id && order.custom_status?.label) {
+    return order.custom_status.label;
+  }
+  return CUSTOMER_ORDER_STATUS_LABELS[order.status];
 }
 
 export function canGenerateCustomerPurchaseOrder(

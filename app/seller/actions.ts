@@ -4,9 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSession, requireSeller } from "@/lib/auth";
-import type { CustomerOrderStatus } from "@/lib/types";
 import {
-  CUSTOMER_ORDER_EDITABLE_STATUSES,
   DIAMOND_SHAPE_OPTIONS,
   GEMSTONE_TYPE_OPTIONS,
   GOLD_COLOR_OPTIONS,
@@ -38,10 +36,6 @@ const ALLOWED_IMAGE_TYPES = [
 ];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
-const EDITABLE_STATUSES = new Set<CustomerOrderStatus>(
-  CUSTOMER_ORDER_EDITABLE_STATUSES
-);
-
 function parseDate(value: unknown): string | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
@@ -52,56 +46,6 @@ function parseDate(value: unknown): string | null {
 function parseBool(value: unknown): boolean {
   const v = String(value ?? "");
   return v === "on" || v === "true" || v === "1";
-}
-
-const NEW_FACTORY_OPTION = "__new__";
-
-function normalizeFactoryName(name: string): string {
-  return name.trim().replace(/\s+/g, " ");
-}
-
-/** Resolve factory_id from form: existing id, or find/create by name (case-insensitive). */
-async function resolveFactoryId(
-  formData: FormData
-): Promise<string | null> {
-  const factoryId = String(formData.get("factory_id") ?? "").trim();
-  const newNameRaw = String(formData.get("factory_name_new") ?? "");
-  const newName = normalizeFactoryName(newNameRaw);
-
-  const client = createAdminClient();
-
-  if (factoryId && factoryId !== NEW_FACTORY_OPTION) {
-    const { data } = await client
-      .from("factories")
-      .select("id")
-      .eq("id", factoryId)
-      .maybeSingle();
-    return data?.id ?? null;
-  }
-
-  if (!newName) return null;
-
-  const { data: existing } = await client
-    .from("factories")
-    .select("id, name");
-
-  const match = (existing ?? []).find(
-    (f) => normalizeFactoryName(f.name).toLowerCase() === newName.toLowerCase()
-  );
-  if (match) return match.id;
-
-  const { data: created, error } = await client
-    .from("factories")
-    .insert({ name: newName })
-    .select("id")
-    .single();
-
-  if (error || !created) return null;
-
-  revalidatePath("/admin/factories");
-  revalidatePath("/seller/orders/new");
-  revalidatePath("/admin/customer-orders");
-  return created.id;
 }
 
 export async function uploadCustomerOrderPhoto(
@@ -157,11 +101,6 @@ export async function createCustomerOrder(formData: FormData) {
     redirect("/seller/orders/new?error=missing");
   }
 
-  const factory_id = await resolveFactoryId(formData);
-  if (!factory_id) {
-    redirect("/seller/orders/new?error=missing");
-  }
-
   const payload = {
     seller_id: session.id,
     product_name,
@@ -181,11 +120,12 @@ export async function createCustomerOrder(formData: FormData) {
       GEMSTONE_TYPES
     ),
     size: parseOptionalText(formData.get("size")),
-    factory_id,
+    factory_id: null,
     due_date: parseDate(formData.get("due_date")),
     is_urgent: parseBool(formData.get("is_urgent")),
     is_restock: parseBool(formData.get("is_restock")),
-    status: "ordered" as const,
+    status: "pending_order" as const,
+    custom_status_id: null,
     updated_at: new Date().toISOString(),
   };
 
@@ -229,32 +169,27 @@ export async function updateCustomerOrder(formData: FormData) {
   }
 
   const locked = !!existing.customer_purchase_order_id;
-  const statusRaw = String(formData.get("status") ?? "").trim();
-  const status = EDITABLE_STATUSES.has(statusRaw as CustomerOrderStatus)
-    ? (statusRaw as CustomerOrderStatus)
-    : (existing.status as CustomerOrderStatus);
 
   const patch: Record<string, unknown> = {
-    status,
     arrived_panama_at: parseDate(formData.get("arrived_panama_at")),
     delivered_at: parseDate(formData.get("delivered_at")),
     notes: String(formData.get("notes") ?? "").trim() || null,
-    customer_name: String(formData.get("customer_name") ?? "").trim() || existing.customer_name,
+    customer_name:
+      String(formData.get("customer_name") ?? "").trim() ||
+      existing.customer_name,
     due_date: parseDate(formData.get("due_date")),
     is_urgent: parseBool(formData.get("is_urgent")),
     is_restock: parseBool(formData.get("is_restock")),
-    ordered_at:
-      parseDate(formData.get("ordered_at")) ?? existing.ordered_at,
+    ordered_at: parseDate(formData.get("ordered_at")) ?? existing.ordered_at,
     photo_url: String(formData.get("photo_url") ?? "").trim() || null,
+    // Lightspeed SKU stays editable even after PO lock
+    lightspeed_sku: parseOptionalText(formData.get("lightspeed_sku")),
     updated_at: new Date().toISOString(),
   };
 
   if (!locked) {
     const product_name = String(formData.get("product_name") ?? "").trim();
     if (product_name) patch.product_name = product_name;
-    const factory_id = await resolveFactoryId(formData);
-    if (factory_id) patch.factory_id = factory_id;
-    patch.lightspeed_sku = parseOptionalText(formData.get("lightspeed_sku"));
     patch.provider_sku = parseOptionalText(formData.get("provider_sku"));
     patch.gold_color = parseOptionalSelect(
       formData.get("gold_color"),
@@ -310,6 +245,7 @@ export async function cancelCustomerOrder(formData: FormData) {
       .from("customer_orders")
       .update({
         status: "cancelled",
+        custom_status_id: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);

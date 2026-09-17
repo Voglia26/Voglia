@@ -6,8 +6,8 @@ import { getSession } from "@/lib/auth";
 import { updateCustomerOrder } from "@/app/seller/actions";
 import type { CustomerOrder, Factory } from "@/lib/types";
 import {
-  CUSTOMER_ORDER_STATUS_LABELS,
   customerOrderLeadDays,
+  customerOrderStatusLabel,
   isCustomerOrderCancelled,
   isCustomerOrderLocked,
 } from "@/lib/types";
@@ -23,22 +23,32 @@ import { cn } from "@/lib/utils";
 function CancelledReadOnly({
   order,
   factoryName,
+  customStatusLabel,
 }: {
   order: CustomerOrder;
   factoryName: string | null;
+  customStatusLabel: string | null;
 }) {
   const lead = customerOrderLeadDays(order.ordered_at, order.delivered_at);
   const fields: { label: string; value: string }[] = [
     { label: "Clienta", value: order.customer_name },
     { label: "Producto", value: order.product_name },
     { label: "Notas", value: order.notes?.trim() || "—" },
-    { label: "Proveedor", value: factoryName ?? "—" },
+    {
+      label: "Proveedor",
+      value: factoryName ?? "Pendiente de asignar por admin",
+    },
     { label: "SKU Lightspeed", value: order.lightspeed_sku?.trim() || "—" },
     { label: "Fecha del pedido", value: order.ordered_at.slice(0, 10) },
     { label: "Fecha límite", value: order.due_date?.slice(0, 10) ?? "—" },
     {
       label: "Estado",
-      value: CUSTOMER_ORDER_STATUS_LABELS[order.status],
+      value: customerOrderStatusLabel({
+        ...order,
+        custom_status: customStatusLabel
+          ? { label: customStatusLabel }
+          : null,
+      }),
     },
     {
       label: "Llegó a Panamá",
@@ -97,7 +107,9 @@ export default async function SellerOrderDetailPage({
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("customer_orders")
-    .select("*, factory:factories(id, name)")
+    .select(
+      "*, factory:factories(id, name), custom_status:customer_order_custom_statuses(id, label)"
+    )
     .eq("id", id)
     .eq("seller_id", session.id)
     .maybeSingle();
@@ -106,17 +118,16 @@ export default async function SellerOrderDetailPage({
 
   type Row = CustomerOrder & {
     factory: Pick<Factory, "id" | "name"> | Pick<Factory, "id" | "name">[] | null;
+    custom_status: { id: string; label: string } | { id: string; label: string }[] | null;
   };
   const row = data as unknown as Row;
   const order: CustomerOrder = row;
   const factory = Array.isArray(row.factory)
     ? row.factory[0] ?? null
     : row.factory;
-
-  const { data: factories } = await supabase
-    .from("factories")
-    .select("id, name")
-    .order("name");
+  const customStatus = Array.isArray(row.custom_status)
+    ? row.custom_status[0] ?? null
+    : row.custom_status;
 
   const lead = customerOrderLeadDays(order.ordered_at, order.delivered_at);
   const locked = isCustomerOrderLocked(order);
@@ -141,7 +152,10 @@ export default async function SellerOrderDetailPage({
           >
             {order.product_name}
           </h1>
-          <CustomerOrderStatusBadge status={order.status} />
+          <CustomerOrderStatusBadge
+            status={order.status}
+            customLabel={customStatus?.label}
+          />
           {order.is_urgent && !cancelled && <UrgentBadge />}
           {order.is_restock && <RestockBadge />}
         </div>
@@ -156,13 +170,15 @@ export default async function SellerOrderDetailPage({
         <CancelledReadOnly
           order={order}
           factoryName={factory?.name ?? null}
+          customStatusLabel={customStatus?.label ?? null}
         />
       ) : (
         <CustomerOrderForm
-          factories={factories ?? []}
           order={order}
           action={updateCustomerOrder}
           submitLabel="Guardar cambios"
+          factoryName={factory?.name ?? null}
+          customStatusLabel={customStatus?.label ?? null}
         />
       )}
     </div>

@@ -1,18 +1,15 @@
 "use client";
 
-import type { Factory } from "@/lib/types";
 import {
-  CUSTOMER_ORDER_EDITABLE_STATUSES,
-  CUSTOMER_ORDER_STATUS_LABELS,
   DIAMOND_SHAPE_OPTIONS,
   GEMSTONE_TYPE_OPTIONS,
   GOLD_COLOR_OPTIONS,
+  customerOrderStatusLabel,
   isCustomerOrderLocked,
   type CustomerOrder,
 } from "@/lib/types";
 import { CustomerOrderPhotoField } from "@/components/customer-orders/photo-field";
 import { CancelCustomerOrderButton } from "@/components/customer-orders/cancel-button";
-import { FactorySelectField } from "@/components/customer-orders/factory-select-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,22 +19,32 @@ const selectClassName =
   "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50";
 
 export function CustomerOrderForm({
-  factories,
   order,
   action,
   submitLabel,
   defaultOrderedAt,
+  factoryName,
+  customStatusLabel,
 }: {
-  factories: Pick<Factory, "id" | "name">[];
   order?: CustomerOrder | null;
   action: (formData: FormData) => Promise<void>;
   submitLabel: string;
   /** Server-provided YYYY-MM-DD for new orders (avoids hydration mismatch). */
   defaultOrderedAt?: string;
+  factoryName?: string | null;
+  customStatusLabel?: string | null;
 }) {
   const locked = order ? isCustomerOrderLocked(order) : false;
   const orderedAtDefault =
     order?.ordered_at?.slice(0, 10) ?? defaultOrderedAt ?? "";
+  const statusLabel = order
+    ? customerOrderStatusLabel({
+        ...order,
+        custom_status: customStatusLabel
+          ? { label: customStatusLabel }
+          : null,
+      })
+    : null;
 
   return (
     <div className="space-y-6 max-w-xl">
@@ -46,9 +53,9 @@ export function CustomerOrderForm({
 
         {locked && (
           <p className="text-sm rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100 dark:border-amber-900">
-            Este pedido ya tiene Purchase Order. Producto, proveedor, SKUs y
+            Este pedido ya tiene Purchase Order. Producto, SKU proveedor y
             características del producto no se pueden editar. Sí puedes
-            actualizar estado y fechas.
+            actualizar fechas y el SKU Lightspeed.
           </p>
         )}
 
@@ -184,7 +191,6 @@ export function CustomerOrderForm({
             <Input
               id="lightspeed_sku"
               name="lightspeed_sku"
-              disabled={locked}
               defaultValue={order?.lightspeed_sku ?? ""}
               placeholder="Uso interno"
             />
@@ -201,11 +207,24 @@ export function CustomerOrderForm({
           </div>
         </div>
 
-        <FactorySelectField
-          factories={factories}
-          defaultFactoryId={order?.factory_id}
-          disabled={locked}
-        />
+        {order && (
+          <div className="rounded-lg border bg-muted/30 px-3 py-3 space-y-2 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Proveedor
+              </p>
+              <p className="mt-0.5">
+                {factoryName?.trim() || "Pendiente de asignar por admin"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Estado
+              </p>
+              <p className="mt-0.5">{statusLabel}</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-6">
           <label className="inline-flex items-center gap-2 text-sm">
@@ -230,22 +249,7 @@ export function CustomerOrderForm({
 
         {order && (
           <div className="space-y-4 rounded-lg border p-4">
-            <p className="text-sm font-medium">Estado y fechas de avance</p>
-            <div className="space-y-2">
-              <Label htmlFor="status">Estado</Label>
-              <select
-                id="status"
-                name="status"
-                defaultValue={order.status}
-                className={selectClassName}
-              >
-                {CUSTOMER_ORDER_EDITABLE_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {CUSTOMER_ORDER_STATUS_LABELS[s]}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <p className="text-sm font-medium">Fechas de avance</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="arrived_panama_at">Llegó a Panamá</Label>
