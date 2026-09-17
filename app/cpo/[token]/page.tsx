@@ -72,7 +72,7 @@ export default async function PublicCustomerPOPage({
             {order.photo_url ? (
               <Image
                 src={order.photo_url}
-                alt={order.product_name}
+                alt={order.customer_name}
                 width={280}
                 height={280}
                 className="h-48 w-48 sm:h-56 sm:w-56 object-cover rounded-lg border shrink-0"
@@ -87,11 +87,8 @@ export default async function PublicCustomerPOPage({
             <div className="flex-1 min-w-0 space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1">
-                    Product
-                  </p>
                   <h2 className="font-heading text-2xl leading-tight">
-                    {order.product_name}
+                    Customer: {order.customer_name}
                   </h2>
                 </div>
                 <div className="text-right shrink-0">
