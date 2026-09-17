@@ -15,15 +15,15 @@ export async function loadCustomerPurchaseOrderByToken(
   token: string
 ): Promise<CustomerPOView | null> {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("customer_purchase_orders")
     .select(
-      "*, factory:factories(*), customer_order:customer_orders(*)"
+      "*, factory:factories(*), customer_order:customer_orders!customer_purchase_orders_customer_order_id_fkey(*)"
     )
     .eq("token", token)
     .maybeSingle();
 
-  if (!data) return null;
+  if (error || !data) return null;
 
   type Row = CustomerPurchaseOrder & {
     factory: Factory | Factory[];
@@ -49,15 +49,15 @@ export async function loadCustomerPurchaseOrderById(
   id: string
 ): Promise<CustomerPOView | null> {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("customer_purchase_orders")
     .select(
-      "*, factory:factories(*), customer_order:customer_orders(*)"
+      "*, factory:factories(*), customer_order:customer_orders!customer_purchase_orders_customer_order_id_fkey(*)"
     )
     .eq("id", id)
     .maybeSingle();
 
-  if (!data) return null;
+  if (error || !data) return null;
 
   type Row = CustomerPurchaseOrder & {
     factory: Factory | Factory[];
