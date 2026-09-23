@@ -57,7 +57,8 @@ type CostFieldKey =
   | (typeof QUOTE_TOTAL_SUM_KEYS)[number]
   | "diamond_cost"
   | "gold_weight_g"
-  | "gold_loss_g";
+  | "gold_loss_g"
+  | "total_carats";
 
 type Values = Partial<Record<CostFieldKey, string>>;
 type FieldKey = string;
@@ -81,6 +82,7 @@ const ALL_COST_FIELDS: CostFieldKey[] = [
   "diamond_cost",
   "labor",
   "other_fees",
+  "total_carats",
 ];
 
 const COST_LABELS: Record<CostFieldKey, string> = {
@@ -90,6 +92,7 @@ const COST_LABELS: Record<CostFieldKey, string> = {
   diamond_cost: "Diamond cost",
   labor: "Labor",
   other_fees: "Other fees",
+  total_carats: "Total carats",
 };
 
 function emptyGoldLossState(): GoldLossState {
@@ -179,6 +182,8 @@ function initialStoneLinesFromQuote(q: Quote | null | undefined): LocalStoneLine
       total_carats: String(line.total_carats),
     }));
   }
+  // Legacy: only convert cost_per_carat + total_carats into a stone line when BOTH exist.
+  // A simple total_carats alone stays in the dedicated form field (not stone_lines).
   if (
     q.cost_per_carat !== null &&
     q.cost_per_carat !== undefined &&
@@ -268,6 +273,17 @@ function initialFormState(rows: FactoryFormRow[]) {
 
       const v: Values = {};
       for (const key of ALL_COST_FIELDS) {
+        if (key === "total_carats") {
+          // Seed simple Total carats only when not already represented by stone_lines
+          // or legacy cost_per_carat + total_carats pair (shown as a stone line).
+          const hasLines = normalizeStoneLines(q.stone_lines).length > 0;
+          const hasPairedLegacy =
+            q.cost_per_carat !== null &&
+            q.cost_per_carat !== undefined &&
+            q.total_carats !== null &&
+            q.total_carats !== undefined;
+          if (hasLines || hasPairedLegacy) continue;
+        }
         const n = q[key as keyof typeof q];
         if (n !== null && n !== undefined) v[key] = String(n);
       }
@@ -308,7 +324,7 @@ function parseCostValues(
     total_gold_cost,
     diamond_cost: num("diamond_cost"),
     cost_per_carat: null,
-    total_carats: null,
+    total_carats: num("total_carats"),
     stone_lines,
     labor: num("labor"),
     other_fees: num("other_fees"),
@@ -602,7 +618,7 @@ export function FactoryForm({
             total_gold_cost: parsed.total_gold_cost ?? null,
             diamond_cost: parsed.diamond_cost ?? null,
             cost_per_carat: null,
-            total_carats: null,
+            total_carats: parsed.total_carats ?? null,
             stone_lines: parsed.stone_lines ?? [],
             labor: parsed.labor ?? null,
             other_fees: parsed.other_fees ?? null,
@@ -1034,6 +1050,46 @@ export function FactoryForm({
                                   </p>
                                 </div>
                               )}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 rounded-lg border border-border bg-background/60 p-4 space-y-3">
+                            <div className="space-y-1.5 max-w-xs">
+                              <label
+                                htmlFor={`${fk}-total_carats`}
+                                className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                              >
+                                Total carats
+                              </label>
+                              <input
+                                id={`${fk}-total_carats`}
+                                name={costFieldName(
+                                  row.assignmentId,
+                                  variant.id,
+                                  "total_carats"
+                                )}
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                defaultValue={
+                                  initialRef.current.values[fk]?.total_carats ??
+                                  ""
+                                }
+                                onChange={(e) =>
+                                  handleCostInput(
+                                    fk,
+                                    "total_carats",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="e.g. 1.25"
+                                className="block h-11 w-full cursor-text rounded-lg border border-input bg-background px-3 text-base tabular-nums text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Optional. Use this if you are not filling the stone
+                                type breakdown below. Compare will prefer the
+                                breakdown when present.
+                              </p>
                             </div>
                           </div>
 

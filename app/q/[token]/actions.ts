@@ -56,7 +56,8 @@ function normalizeQuoteValues(values: QuoteValuesInput): QuoteValuesInput {
     gold_loss,
     gold_loss_percent: usesGoldPercent ? values.gold_loss_percent : null,
     cost_per_carat: usesStones ? null : values.cost_per_carat,
-    total_carats: usesStones ? null : values.total_carats,
+    // Keep simple total_carats even when stone_lines exist (Compare prefers lines).
+    total_carats: values.total_carats,
   };
 }
 
