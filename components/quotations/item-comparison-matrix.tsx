@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   fetchRoundPurchaseOrders,
+  generatePurchaseOrderForFactory,
   syncPurchaseOrderItem,
   type AwardInput,
   type RoundPoItem,
@@ -196,6 +197,9 @@ export function ItemComparisonMatrix({
     initialRoundPurchaseOrders
   );
   const [generatingItemId, setGeneratingItemId] = useState<string | null>(null);
+  const [generatingFactoryId, setGeneratingFactoryId] = useState<string | null>(
+    null
+  );
   const [, startTransition] = useTransition();
   const notesEditable = quotationStatus !== "closed";
   const [err, setErr] = useState<string | null>(null);
@@ -296,6 +300,12 @@ export function ItemComparisonMatrix({
       setErr("Elige un ganador con cantidad ≥ 1.");
       return;
     }
+    if (!findSavedItem(roundPurchaseOrders, row.item.id)) {
+      setErr(
+        "Generá primero la PO de la fábrica abajo; después podés actualizar este producto."
+      );
+      return;
+    }
 
     const allAwards = buildAwardPayload();
     setGeneratingItemId(row.item.id);
@@ -312,6 +322,39 @@ export function ItemComparisonMatrix({
         ...prev,
         [row.item.id]: res.item.notes ?? "",
       }));
+      if (res.quotationClosed) onQuotationClosed?.();
+    });
+  }
+
+  function handleGenerateFactory(factoryId: string) {
+    setErr(null);
+    const allAwards = buildAwardPayload();
+    const factoryAwards = allAwards.filter((a) => a.factory_id === factoryId);
+    // Solo ítems aún no en la PO agrupada — los ya guardados se editan con Actualizar PO
+    const pendingAwards = factoryAwards.filter(
+      (a) => !findSavedItem(roundPurchaseOrders, a.item_id)
+    );
+
+    if (pendingAwards.length === 0) {
+      setErr("No hay productos pendientes para esta fábrica.");
+      return;
+    }
+
+    setGeneratingFactoryId(factoryId);
+    startTransition(async () => {
+      const res = await generatePurchaseOrderForFactory(
+        quotationId,
+        factoryId,
+        pendingAwards,
+        allAwards
+      );
+      setGeneratingFactoryId(null);
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      const updated = await fetchRoundPurchaseOrders(quotationId);
+      setRoundPurchaseOrders(updated);
       if (res.quotationClosed) onQuotationClosed?.();
     });
   }
@@ -340,11 +383,8 @@ export function ItemComparisonMatrix({
         if (po.factory_id !== factoryId) continue;
         for (const line of po.items) savedItemIds.add(line.item_id);
       }
-      const pendingItemIds = awardedItemIds.filter((id) => {
-        const row = rows.find((r) => r.item.id === id);
-        if (!row) return false;
-        return isRowPoDirty(row);
-      });
+      // Pending = adjudicado pero aún no en la PO agrupada de la fábrica
+      const pendingItemIds = awardedItemIds.filter((id) => !savedItemIds.has(id));
       const roundPos = roundPurchaseOrders.filter(
         (po) => po.factory_id === factoryId
       );
@@ -356,7 +396,7 @@ export function ItemComparisonMatrix({
         roundPos,
       };
     });
-  }, [awards, rows, factories, roundPurchaseOrders, notesByItem]);
+  }, [awards, rows, factories, roundPurchaseOrders]);
 
   const awardsCount = Object.values(awards).filter((a) => a.quantity >= 1).length;
 
@@ -595,21 +635,25 @@ export function ItemComparisonMatrix({
                               )}
                               placeholder="e.g. 5× YG, 3× WG, size 7…"
                             />
-                            {notesEditable && award && isRowPoDirty(row) && (
+                            {notesEditable &&
+                              award &&
+                              findSavedItem(roundPurchaseOrders, row.item.id) &&
+                              isRowPoDirty(row) && (
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="secondary"
                                 className="w-full"
-                                disabled={generatingItemId === row.item.id}
+                                disabled={
+                                  generatingItemId === row.item.id ||
+                                  !!generatingFactoryId
+                                }
                                 onClick={() => handleSyncItem(row)}
                               >
                                 {generatingItemId === row.item.id && (
                                   <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                                 )}
-                                {findSavedItem(roundPurchaseOrders, row.item.id)
-                                  ? "Actualizar PO"
-                                  : "Generate PO"}
+                                Actualizar PO
                               </Button>
                             )}
                             {notesEditable &&
@@ -639,15 +683,17 @@ export function ItemComparisonMatrix({
           para editar notas y generar nuevas órdenes. Las POs existentes no se
           modifican.
         </p>
+      ) : awardsCount > 0 ? (
+        <FactoryPoActions
+          summaries={factorySummaries}
+          generatingFactoryId={generatingFactoryId}
+          quotationOpen={notesEditable}
+          onGenerate={handleGenerateFactory}
+        />
       ) : (
-        <>
-          {awardsCount === 0 && (
-            <p className="text-sm text-muted-foreground pt-2 border-t">
-              Elige al menos un ganador por producto para generar POs por fábrica.
-            </p>
-          )}
-          <FactoryPoActions summaries={factorySummaries} />
-        </>
+        <p className="text-sm text-muted-foreground pt-2 border-t">
+          Elige al menos un ganador por producto para generar POs por fábrica.
+        </p>
       )}
     </div>
   );

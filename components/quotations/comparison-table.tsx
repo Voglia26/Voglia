@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { ItemPhotos } from "@/components/items/item-photos";
 import type { QuotationStatus } from "@/lib/types";
 import {
@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import {
   fetchRoundPurchaseOrders,
+  generatePurchaseOrderForFactory,
   type AwardInput,
   type RoundPurchaseOrder,
 } from "@/app/admin/(dash)/quotations/[id]/compare/actions";
@@ -60,8 +61,12 @@ export function ComparisonTable({
   const [roundPurchaseOrders, setRoundPurchaseOrders] = useState<
     RoundPurchaseOrder[]
   >([]);
+  const [generatingFactoryId, setGeneratingFactoryId] = useState<string | null>(
+    null
+  );
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,6 +81,14 @@ export function ComparisonTable({
       setNotesByItem(notes);
     });
   }, [quotationId]);
+
+  const itemsInRound = useMemo(() => {
+    const ids = new Set<string>();
+    for (const po of roundPurchaseOrders) {
+      for (const line of po.items) ids.add(line.item_id);
+    }
+    return ids;
+  }, [roundPurchaseOrders]);
 
   const tableRows = useMemo(() => {
     const base = rows.map((row) => ({
@@ -123,6 +136,36 @@ export function ComparisonTable({
       .filter((x): x is AwardInput => x !== null);
   }
 
+  function handleGenerateFactory(factoryId: string) {
+    setErr(null);
+    const allAwards = buildAwardPayload();
+    const factoryAwards = allAwards.filter((a) => a.factory_id === factoryId);
+    const pendingAwards = factoryAwards.filter(
+      (a) => !itemsInRound.has(a.item_id)
+    );
+    if (pendingAwards.length === 0) {
+      setErr("No hay productos pendientes para esta fábrica.");
+      return;
+    }
+
+    setGeneratingFactoryId(factoryId);
+    startTransition(async () => {
+      const res = await generatePurchaseOrderForFactory(
+        quotationId,
+        factoryId,
+        pendingAwards,
+        allAwards
+      );
+      setGeneratingFactoryId(null);
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      const updated = await fetchRoundPurchaseOrders(quotationId);
+      setRoundPurchaseOrders(updated);
+    });
+  }
+
   const factorySummaries = useMemo((): FactoryAwardSummary[] => {
     const allAwards = buildAwardPayload();
     const factoryIds = [...new Set(allAwards.map((a) => a.factory_id))];
@@ -130,6 +173,9 @@ export function ComparisonTable({
       const awardedItemIds = allAwards
         .filter((a) => a.factory_id === factoryId)
         .map((a) => a.item_id);
+      const pendingItemIds = awardedItemIds.filter(
+        (id) => !itemsInRound.has(id)
+      );
       const roundPos = roundPurchaseOrders.filter(
         (po) => po.factory_id === factoryId
       );
@@ -139,11 +185,11 @@ export function ComparisonTable({
         factoryId,
         factoryName,
         awardedItemIds,
-        pendingItemIds: [],
+        pendingItemIds,
         roundPos,
       };
     });
-  }, [awards, notesByItem, tableRows, roundPurchaseOrders, rows]);
+  }, [awards, notesByItem, tableRows, itemsInRound, roundPurchaseOrders, rows]);
 
   const awardsCount = Object.values(awards).filter((q) => q >= 1).length;
 
@@ -360,15 +406,17 @@ export function ComparisonTable({
           This quotation is already closed and purchase orders have been
           generated.
         </p>
+      ) : awardsCount > 0 ? (
+        <FactoryPoActions
+          summaries={factorySummaries}
+          generatingFactoryId={generatingFactoryId}
+          quotationOpen
+          onGenerate={handleGenerateFactory}
+        />
       ) : (
-        <>
-          {awardsCount === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Select at least one winner with quantity ≥ 1.
-            </p>
-          )}
-          <FactoryPoActions summaries={factorySummaries} />
-        </>
+        <p className="text-sm text-muted-foreground">
+          Select at least one winner with quantity ≥ 1.
+        </p>
       )}
     </div>
   );

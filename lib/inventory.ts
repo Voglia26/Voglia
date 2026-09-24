@@ -75,14 +75,18 @@ export async function syncInventoryFromAwards(
 
     const { error: priceErr } = await supabase
       .from("inventory_price_entries")
-      .insert({
-        inventory_product_id: product.id,
-        quotation_id,
-        purchase_order_id: award.purchase_order_id,
-        unit_price: quoteTotal(quote),
-        quantity: award.quantity,
-        quote_snapshot: quote,
-      });
+      .upsert(
+        {
+          inventory_product_id: product.id,
+          quotation_id,
+          purchase_order_id: award.purchase_order_id,
+          unit_price: quoteTotal(quote),
+          quantity: award.quantity,
+          quote_snapshot: quote,
+          ordered_at: now,
+        },
+        { onConflict: "purchase_order_id,inventory_product_id" }
+      );
 
     if (priceErr) return { ok: false, error: priceErr.message };
   }
